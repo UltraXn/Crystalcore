@@ -91,9 +91,8 @@ public class CrystalLink extends JavaPlugin {
             try (PreparedStatement stmt = conn.prepareStatement(
                     "ALTER TABLE web_verifications MODIFY code VARCHAR(64)")) {
                 stmt.execute();
-            } catch (SQLException ignored) {
-                // Ignore if this fails (e.g. if not supported or other minor issue),
-                // but it's necessary for migration from older versions.
+            } catch (SQLException e) {
+                getLogger().warning("Could not update 'code' column size: " + e.getMessage());
             }
 
             getLogger().info("Database connected & table verified.");
