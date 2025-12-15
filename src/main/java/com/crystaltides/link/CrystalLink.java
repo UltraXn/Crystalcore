@@ -100,8 +100,9 @@ public class CrystalLink extends JavaPlugin {
             return false;
         }
 
-        // Create Table if not exists and ensure schema is correct
+        // Create Tables if not exists
         try (Connection conn = dataSource.getConnection()) {
+            // 1. Table for pending codes (Temporary)
             try (PreparedStatement stmt = conn.prepareStatement(
                     "CREATE TABLE IF NOT EXISTS web_verifications (" +
                             "uuid VARCHAR(36) PRIMARY KEY, " +
@@ -112,8 +113,18 @@ public class CrystalLink extends JavaPlugin {
                 stmt.execute();
             }
 
-            // Attempt to update column size to support UUIDs (36 chars) if it was created
-            // smaller
+            // 2. Table for linked accounts (Permanent)
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "CREATE TABLE IF NOT EXISTS linked_accounts (" +
+                            "uuid VARCHAR(36) PRIMARY KEY, " +
+                            "player_name VARCHAR(16), " +
+                            "web_user_id VARCHAR(100), " +
+                            "linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                            ");")) {
+                stmt.execute();
+            }
+
+            // Migration for code column size
             try (PreparedStatement stmt = conn.prepareStatement(
                     "ALTER TABLE web_verifications MODIFY code VARCHAR(64)")) {
                 stmt.execute();
@@ -121,7 +132,7 @@ public class CrystalLink extends JavaPlugin {
                 getLogger().warning("Could not update 'code' column size: " + e.getMessage());
             }
 
-            getLogger().info("Database connected & table verified.");
+            getLogger().info("Database connected & tables verified.");
             return true;
         } catch (SQLException e) {
             getLogger().severe("Could not connect to MySQL! Plugin will not work.");
@@ -191,19 +202,27 @@ public class CrystalLink extends JavaPlugin {
         String prefix = getConfig().getString("messages.prefix", "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
         Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
             try (Connection conn = dataSource.getConnection()) {
+                // Delete from permanent table
                 try (PreparedStatement deleteStmt = conn
-                        .prepareStatement("DELETE FROM web_verifications WHERE uuid = ?")) {
+                        .prepareStatement("DELETE FROM linked_accounts WHERE uuid = ?")) {
                     deleteStmt.setString(1, player.getUniqueId().toString());
                     int rows = deleteStmt.executeUpdate();
+
+                    // Also delete any pending verification codes
+                    try (PreparedStatement deletePending = conn
+                            .prepareStatement("DELETE FROM web_verifications WHERE uuid = ?")) {
+                        deletePending.setString(1, player.getUniqueId().toString());
+                        deletePending.executeUpdate();
+                    }
 
                     if (rows > 0) {
                         player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
                                 prefix + getConfig().getString("messages.unlink-success",
-                                        "<green>Tu solicitud de vinculación ha sido cancelada.")));
+                                        "<green>Tu cuenta ha sido desvinculada exitosamente.")));
                     } else {
                         player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
                                 prefix + getConfig().getString("messages.unlink-not-found",
-                                        "<red>No tienes ninguna solicitud pendiente.")));
+                                        "<red>No tienes ninguna cuenta vinculada.")));
                     }
                 }
             } catch (SQLException e) {
@@ -216,24 +235,36 @@ public class CrystalLink extends JavaPlugin {
     }
 
     private void handleLink(Player player) {
-        // Generate Token (UUID)
-        String token = java.util.UUID.randomUUID().toString();
-        long expiresAt = System.currentTimeMillis() + (10 * 60 * 1000); // 10 minutes expiration
-        String domain = getConfig().getString("domain", "crystaltidesSMP.net");
-        // Ensure domain has protocol
-        if (!domain.startsWith("http")) {
-            domain = "https://" + domain;
-        }
-        // Remove trailing slash if present
-        if (domain.endsWith("/")) {
-            domain = domain.substring(0, domain.length() - 1);
-        }
+        String prefix = getConfig().getString("messages.prefix",
+                "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
 
-        String link = domain + "/verify?token=" + token;
-
-        // Run Async
         Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
             try (Connection conn = dataSource.getConnection()) {
+                // 1. Check if already linked
+                try (PreparedStatement checkStmt = conn
+                        .prepareStatement("SELECT uuid FROM linked_accounts WHERE uuid = ?")) {
+                    checkStmt.setString(1, player.getUniqueId().toString());
+                    if (checkStmt.executeQuery().next()) {
+                        player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                prefix + getConfig().getString("messages.already-linked",
+                                        "<red>Ya tienes una cuenta vinculada. Usa /unlink para desvincularla.")));
+                        return;
+                    }
+                }
+
+                // 2. Generate Token logic
+                String token = java.util.UUID.randomUUID().toString();
+                long expiresAt = System.currentTimeMillis() + (10 * 60 * 1000); // 10 minutes expiration
+                String domain = getConfig().getString("domain", "crystaltidesSMP.net");
+                if (!domain.startsWith("http")) {
+                    domain = "https://" + domain;
+                }
+                if (domain.endsWith("/")) {
+                    domain = domain.substring(0, domain.length() - 1);
+                }
+
+                String link = domain + "/verify?token=" + token;
+
                 // Delete old codes for this user
                 try (PreparedStatement deleteStmt = conn
                         .prepareStatement("DELETE FROM web_verifications WHERE uuid = ?")) {
@@ -251,10 +282,7 @@ public class CrystalLink extends JavaPlugin {
                     insertStmt.executeUpdate();
                 }
 
-                // Send clickable message to player
-                String prefix = getConfig().getString("messages.prefix",
-                        "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
-
+                // Send clickable message
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
                         prefix + getConfig().getString("messages.link-generated", "Vinculación Web")));
@@ -272,8 +300,6 @@ public class CrystalLink extends JavaPlugin {
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
 
             } catch (SQLException e) {
-                String prefix = getConfig().getString("messages.prefix",
-                        "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
                         prefix + getConfig().getString("messages.db-connection-error",
                                 "<red>Error al conectar con la base de datos.")));
@@ -318,9 +344,23 @@ public class CrystalLink extends JavaPlugin {
 
             // %crystallink_status%
             if (identifier.equals("status")) {
-                // TODO: Check real verification status from DB when we have the users table
-                // For now, return "Not Verified" or check pending
-                return "Not Verified";
+                // Check database synchronously (Warning: PAPI requests are usually sync, so we
+                // need a cached value or fast DB)
+                // For better performance, we should cache this state on join/link/unlink.
+                // But for now, let's do a quick check.
+                if (plugin.dataSource != null && !plugin.dataSource.isClosed()) {
+                    try (Connection conn = plugin.dataSource.getConnection();
+                            PreparedStatement stmt = conn
+                                    .prepareStatement("SELECT 1 FROM linked_accounts WHERE uuid = ?")) {
+                        stmt.setString(1, player.getUniqueId().toString());
+                        if (stmt.executeQuery().next()) {
+                            return plugin.getConfig().getString("messages.status-verified", "Verificado");
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+                return plugin.getConfig().getString("messages.status-not-verified", "No Verificado");
             }
 
             return null;
