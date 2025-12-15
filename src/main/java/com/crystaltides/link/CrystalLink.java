@@ -3,9 +3,7 @@ package com.crystaltides.link;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,7 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Random;
 
-public class CrystalLink extends JavaPlugin implements CommandExecutor {
+public class CrystalLink extends JavaPlugin {
 
     private HikariDataSource dataSource;
     private final Random random = new SecureRandom();
@@ -92,14 +90,16 @@ public class CrystalLink extends JavaPlugin implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "Este comando solo es para jugadores.");
+            sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                    .deserialize("<red>Este comando solo es para jugadores."));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (dataSource == null || dataSource.isClosed()) {
-            player.sendMessage(ChatColor.RED + "No has conectado el plugin a la base de datos.");
+            player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                    .deserialize("<red>No has conectado el plugin a la base de datos."));
             return true;
         }
 
@@ -129,18 +129,20 @@ public class CrystalLink extends JavaPlugin implements CommandExecutor {
                 }
 
                 // Send message to player
-                player.sendMessage("");
-                player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + " [CrystalLink] " + ChatColor.DARK_GRAY + "» "
-                        + ChatColor.GRAY + "Vinculación Web");
-                player.sendMessage(
-                        ChatColor.GRAY + "Tu código de vinculación es: " + ChatColor.YELLOW + ChatColor.BOLD + code);
-                player.sendMessage(
-                        ChatColor.GRAY + "Ingrésalo en " + ChatColor.AQUA + ChatColor.UNDERLINE + domain + "/account");
-                player.sendMessage(ChatColor.RED + "Expira en 5 minutos.");
-                player.sendMessage("");
+                player.sendMessage(net.kyori.adventure.text.Component.empty());
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        "<aqua><bold>[CrystalLink] <dark_gray>» <gray>Vinculación Web"));
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        "<gray>Tu código de vinculación es: <yellow><bold>" + code));
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        "<gray>Ingrésalo en <aqua><u>" + domain + "/account"));
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        "<red>Expira en 5 minutos."));
+                player.sendMessage(net.kyori.adventure.text.Component.empty());
 
             } catch (SQLException e) {
-                player.sendMessage(ChatColor.RED + "Error al conectar con la base de datos.");
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        "<red>Error al conectar con la base de datos."));
                 e.printStackTrace();
             }
         });
