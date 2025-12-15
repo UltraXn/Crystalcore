@@ -1,0 +1,8 @@
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  database: s41940_Base-General
+  username: user
+  password: password
+
+domain: "crystaltides.com"

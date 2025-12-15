@@ -1,0 +1,13 @@
+name: CrystalLink
+version: ${project.version}
+main: com.crystaltides.link.CrystalLink
+api-version: "1.21"
+authors: [UltraXn]
+description: Plugin de vinculacion Web-Minecraft para CrystalTides
+
+commands:
+  link:
+    description: Genera un codigo para vincular tu cuenta en la web.
+    usage: /link
+    permission: crystallink.use
+    permission-message: No tienes permiso para usar este comando.
