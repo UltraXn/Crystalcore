@@ -40,8 +40,15 @@ public class CrystalLink extends JavaPlugin implements CommandExecutor {
 
     @Override
     public void onDisable() {
-        if (dataSource != null) {
-            dataSource.close();
+        // Cancel all async tasks to prevent leaks or errors during reload
+        Bukkit.getScheduler().cancelTasks(this);
+
+        if (dataSource != null && !dataSource.isClosed()) {
+            try {
+                dataSource.close();
+            } catch (Exception e) {
+                getLogger().warning("Error closing database connection: " + e.getMessage());
+            }
         }
         getLogger().info("CrystalLink has been disabled!");
     }
