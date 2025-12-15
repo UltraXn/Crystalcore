@@ -28,6 +28,7 @@ public class CrystalLink extends JavaPlugin {
         // Register Commands
         getCommand("link").setExecutor(this);
         getCommand("unlink").setExecutor(this);
+        getCommand("crystallink").setExecutor(this);
 
         // Register PlaceholderAPI
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -41,7 +42,11 @@ public class CrystalLink extends JavaPlugin {
     public void onDisable() {
         // Cancel all async tasks to prevent leaks or errors during reload
         Bukkit.getScheduler().cancelTasks(this);
+        closeDatabase();
+        getLogger().info("CrystalLink has been disabled!");
+    }
 
+    private void closeDatabase() {
         if (dataSource != null && !dataSource.isClosed()) {
             try {
                 dataSource.close();
@@ -49,7 +54,6 @@ public class CrystalLink extends JavaPlugin {
                 getLogger().warning("Error closing database connection: " + e.getMessage());
             }
         }
-        getLogger().info("CrystalLink has been disabled!");
     }
 
     private boolean setupDatabase() {
@@ -90,9 +94,39 @@ public class CrystalLink extends JavaPlugin {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        String prefix = getConfig().getString("messages.prefix", "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
+
+        if (command.getName().equalsIgnoreCase("crystallink")) {
+            if (!sender.hasPermission("crystallink.admin")) {
+                sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        prefix + getConfig().getString("messages.no-permission",
+                                "<red>No tienes permiso para usar este comando.")));
+                return true;
+            }
+
+            if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
+                reloadConfig();
+                closeDatabase();
+                if (setupDatabase()) {
+                    sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                            prefix + getConfig().getString("messages.reload-success",
+                                    "<green>Configuración recargada y base de datos reconectada.")));
+                } else {
+                    sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                            prefix + "<red>Error al reconectar la base de datos. Revisa la consola."));
+                }
+                return true;
+            }
+
+            sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                    prefix + "<red>Uso: /crystallink reload"));
+            return true;
+        }
+
         if (!(sender instanceof Player)) {
             sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                    getConfig().getString("messages.only-players", "<red>Este comando solo es para jugadores.")));
+                    prefix + getConfig().getString("messages.only-players",
+                            "<red>Este comando solo es para jugadores.")));
             return true;
         }
 
@@ -100,7 +134,8 @@ public class CrystalLink extends JavaPlugin {
 
         if (dataSource == null || dataSource.isClosed()) {
             sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                    getConfig().getString("messages.db-error", "<red>No has conectado el plugin a la base de datos.")));
+                    prefix + getConfig().getString("messages.db-error",
+                            "<red>No has conectado el plugin a la base de datos.")));
             return true;
         }
 
@@ -115,6 +150,7 @@ public class CrystalLink extends JavaPlugin {
     }
 
     private void handleUnlink(Player player) {
+        String prefix = getConfig().getString("messages.prefix", "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
         Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
             try (Connection conn = dataSource.getConnection()) {
                 try (PreparedStatement deleteStmt = conn
@@ -124,17 +160,17 @@ public class CrystalLink extends JavaPlugin {
 
                     if (rows > 0) {
                         player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                                getConfig().getString("messages.unlink-success",
+                                prefix + getConfig().getString("messages.unlink-success",
                                         "<green>Tu solicitud de vinculación ha sido cancelada.")));
                     } else {
                         player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                                getConfig().getString("messages.unlink-not-found",
+                                prefix + getConfig().getString("messages.unlink-not-found",
                                         "<red>No tienes ninguna solicitud pendiente.")));
                     }
                 }
             } catch (SQLException e) {
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        getConfig().getString("messages.db-connection-error",
+                        prefix + getConfig().getString("messages.db-connection-error",
                                 "<red>Error al conectar con la base de datos.")));
                 e.printStackTrace();
             }
@@ -179,7 +215,7 @@ public class CrystalLink extends JavaPlugin {
 
                 // Send clickable message to player
                 String prefix = getConfig().getString("messages.prefix",
-                        "<aqua><bold>[CrystalLink] <dark_gray>» <gray>");
+                        "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
 
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
@@ -198,8 +234,10 @@ public class CrystalLink extends JavaPlugin {
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
 
             } catch (SQLException e) {
+                String prefix = getConfig().getString("messages.prefix",
+                        "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        getConfig().getString("messages.db-connection-error",
+                        prefix + getConfig().getString("messages.db-connection-error",
                                 "<red>Error al conectar con la base de datos.")));
                 e.printStackTrace();
             }

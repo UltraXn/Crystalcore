@@ -16,3 +16,9 @@ commands:
     usage: /unlink
     permission: crystallink.use
     permission-message: No tienes permiso para usar este comando.
+  crystallink:
+    description: Comandos de administración del plugin.
+    usage: /crystallink reload
+    aliases: [cl]
+    permission: crystallink.admin
+    permission-message: No tienes permiso para usar este comando.

@@ -8,7 +8,7 @@ mysql:
 domain: "crystaltidesSMP.net"
 
 messages:
-  prefix: "<aqua><bold>[CrystalLink] <dark_gray>» <gray>"
+  prefix: "<aqua><bold>[CrystalCore] <dark_gray>» <gray>"
   only-players: "<red>Este comando solo es para jugadores."
   db-error: "<red>No has conectado el plugin a la base de datos."
   link-generated: "Vinculación Web"
@@ -18,3 +18,5 @@ messages:
   db-connection-error: "<red>Error al conectar con la base de datos."
   unlink-success: "<green>Tu solicitud de vinculación ha sido cancelada."
   unlink-not-found: "<red>No tienes ninguna solicitud pendiente."
+  reload-success: "<green>Configuración recargada y base de datos reconectada."
+  no-permission: "<red>No tienes permiso para usar este comando."
