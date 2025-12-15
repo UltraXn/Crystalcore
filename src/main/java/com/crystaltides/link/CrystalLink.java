@@ -8,18 +8,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Random;
 
 public class CrystalLink extends JavaPlugin {
 
     private HikariDataSource dataSource;
-    private final Random random = new SecureRandom();
-    private static final String CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed confusing chars like I, 1,
-                                                                                 // O, 0
 
     @Override
     public void onEnable() {
@@ -75,7 +70,7 @@ public class CrystalLink extends JavaPlugin {
                         "CREATE TABLE IF NOT EXISTS web_verifications (" +
                                 "uuid VARCHAR(36) PRIMARY KEY, " +
                                 "player_name VARCHAR(16), " +
-                                "code VARCHAR(10), " +
+                                "code VARCHAR(36), " + // Changed to VARCHAR(36) to accommodate UUID
                                 "expires_at BIGINT" +
                                 ");")) {
             stmt.execute();
@@ -103,10 +98,20 @@ public class CrystalLink extends JavaPlugin {
             return true;
         }
 
-        // Generate Code
-        String code = generateCode(6);
-        long expiresAt = System.currentTimeMillis() + (5 * 60 * 1000); // 5 minutes
-        String domain = getConfig().getString("domain", "crystaltides.com");
+        // Generate Token (UUID)
+        String token = java.util.UUID.randomUUID().toString();
+        long expiresAt = System.currentTimeMillis() + (10 * 60 * 1000); // 10 minutes expiration
+        String domain = getConfig().getString("domain", "crystaltidesSMP.net");
+        // Ensure domain has protocol
+        if (!domain.startsWith("http")) {
+            domain = "https://" + domain;
+        }
+        // Remove trailing slash if present
+        if (domain.endsWith("/")) {
+            domain = domain.substring(0, domain.length() - 1);
+        }
+
+        String link = domain + "/verify?token=" + token;
 
         // Run Async
         Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
@@ -118,26 +123,27 @@ public class CrystalLink extends JavaPlugin {
                     deleteStmt.executeUpdate();
                 }
 
-                // Insert new code
+                // Insert new token
                 try (PreparedStatement insertStmt = conn.prepareStatement(
                         "INSERT INTO web_verifications (uuid, player_name, code, expires_at) VALUES (?, ?, ?, ?)")) {
                     insertStmt.setString(1, player.getUniqueId().toString());
                     insertStmt.setString(2, player.getName());
-                    insertStmt.setString(3, code);
+                    insertStmt.setString(3, token);
                     insertStmt.setLong(4, expiresAt);
                     insertStmt.executeUpdate();
                 }
 
-                // Send message to player
+                // Send clickable message to player
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
                         "<aqua><bold>[CrystalLink] <dark_gray>» <gray>Vinculación Web"));
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<gray>Tu código de vinculación es: <yellow><bold>" + code));
+                        "<gray>Haz clic en el siguiente enlace para vincular tu cuenta:"));
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<gray>Ingrésalo en <aqua><u>" + domain + "/account"));
+                        "<click:open_url:'" + link + "'><hover:show_text:'<aqua>Clic para abrir'><aqua><u>" + link
+                                + "</u></hover></click>"));
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<red>Expira en 5 minutos."));
+                        "<red>Este enlace expira en 10 minutos."));
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
 
             } catch (SQLException e) {
@@ -148,13 +154,5 @@ public class CrystalLink extends JavaPlugin {
         });
 
         return true;
-    }
-
-    private String generateCode(int length) {
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(CHARACTERS.charAt(random.nextInt(CHARACTERS.length())));
-        }
-        return sb.toString();
     }
 }
