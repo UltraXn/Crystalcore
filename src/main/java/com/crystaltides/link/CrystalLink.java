@@ -35,7 +35,33 @@ public class CrystalLink extends JavaPlugin {
             new CrystalLinkExpansion(this).register();
         }
 
+        // Start automatic cleanup of expired codes
+        startCleanupTask();
+
         getLogger().info("CrystalLink has been enabled!");
+    }
+
+    private void startCleanupTask() {
+        // Run cleanup every 30 minutes (1200 ticks * 30 = 36000 ticks)
+        // 20 ticks = 1 second. 30 mins = 1800 seconds = 36000 ticks.
+        long interval = 20L * 60 * 30;
+
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            if (dataSource == null || dataSource.isClosed())
+                return;
+
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement stmt = conn
+                            .prepareStatement("DELETE FROM web_verifications WHERE expires_at < ?")) {
+                stmt.setLong(1, System.currentTimeMillis());
+                int deleted = stmt.executeUpdate();
+                if (deleted > 0) {
+                    getLogger().info("Cleaned up " + deleted + " expired verification codes.");
+                }
+            } catch (SQLException e) {
+                getLogger().warning("Error cleaning up expired codes: " + e.getMessage());
+            }
+        }, interval, interval);
     }
 
     @Override
