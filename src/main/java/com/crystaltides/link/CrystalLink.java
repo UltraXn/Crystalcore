@@ -74,20 +74,33 @@ public class CrystalLink extends JavaPlugin {
             return false;
         }
 
-        // Create Table if not exists
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(
-                        "CREATE TABLE IF NOT EXISTS web_verifications (" +
-                                "uuid VARCHAR(36) PRIMARY KEY, " +
-                                "player_name VARCHAR(16), " +
-                                "code VARCHAR(36), " +
-                                "expires_at BIGINT" +
-                                ");")) {
-            stmt.execute();
+        // Create Table if not exists and ensure schema is correct
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "CREATE TABLE IF NOT EXISTS web_verifications (" +
+                            "uuid VARCHAR(36) PRIMARY KEY, " +
+                            "player_name VARCHAR(16), " +
+                            "code VARCHAR(64), " +
+                            "expires_at BIGINT" +
+                            ");")) {
+                stmt.execute();
+            }
+
+            // Attempt to update column size to support UUIDs (36 chars) if it was created
+            // smaller
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "ALTER TABLE web_verifications MODIFY code VARCHAR(64)")) {
+                stmt.execute();
+            } catch (SQLException ignored) {
+                // Ignore if this fails (e.g. if not supported or other minor issue),
+                // but it's necessary for migration from older versions.
+            }
+
             getLogger().info("Database connected & table verified.");
             return true;
         } catch (SQLException e) {
             getLogger().severe("Could not connect to MySQL! Plugin will not work.");
+            e.printStackTrace();
             return false;
         }
     }
