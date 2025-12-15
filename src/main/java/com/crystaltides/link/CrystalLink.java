@@ -25,8 +25,14 @@ public class CrystalLink extends JavaPlugin {
             getLogger().warning("Failed to connect to the database. Plugin will run in limited mode.");
         }
 
-        // Register Command
+        // Register Commands
         getCommand("link").setExecutor(this);
+        getCommand("unlink").setExecutor(this);
+
+        // Register PlaceholderAPI
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new CrystalLinkExpansion(this).register();
+        }
 
         getLogger().info("CrystalLink has been enabled!");
     }
@@ -70,7 +76,7 @@ public class CrystalLink extends JavaPlugin {
                         "CREATE TABLE IF NOT EXISTS web_verifications (" +
                                 "uuid VARCHAR(36) PRIMARY KEY, " +
                                 "player_name VARCHAR(16), " +
-                                "code VARCHAR(36), " + // Changed to VARCHAR(36) to accommodate UUID
+                                "code VARCHAR(36), " +
                                 "expires_at BIGINT" +
                                 ");")) {
             stmt.execute();
@@ -85,19 +91,57 @@ public class CrystalLink extends JavaPlugin {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                    .deserialize("<red>Este comando solo es para jugadores."));
+            sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                    getConfig().getString("messages.only-players", "<red>Este comando solo es para jugadores.")));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (dataSource == null || dataSource.isClosed()) {
-            player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
-                    .deserialize("<red>No has conectado el plugin a la base de datos."));
+            sender.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                    getConfig().getString("messages.db-error", "<red>No has conectado el plugin a la base de datos.")));
             return true;
         }
 
+        if (command.getName().equalsIgnoreCase("unlink")) {
+            handleUnlink(player);
+            return true;
+        }
+
+        // Handle /link
+        handleLink(player);
+        return true;
+    }
+
+    private void handleUnlink(Player player) {
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+            try (Connection conn = dataSource.getConnection()) {
+                try (PreparedStatement deleteStmt = conn
+                        .prepareStatement("DELETE FROM web_verifications WHERE uuid = ?")) {
+                    deleteStmt.setString(1, player.getUniqueId().toString());
+                    int rows = deleteStmt.executeUpdate();
+
+                    if (rows > 0) {
+                        player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                getConfig().getString("messages.unlink-success",
+                                        "<green>Tu solicitud de vinculación ha sido cancelada.")));
+                    } else {
+                        player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                getConfig().getString("messages.unlink-not-found",
+                                        "<red>No tienes ninguna solicitud pendiente.")));
+                    }
+                }
+            } catch (SQLException e) {
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        getConfig().getString("messages.db-connection-error",
+                                "<red>Error al conectar con la base de datos.")));
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void handleLink(Player player) {
         // Generate Token (UUID)
         String token = java.util.UUID.randomUUID().toString();
         long expiresAt = System.currentTimeMillis() + (10 * 60 * 1000); // 10 minutes expiration
@@ -134,25 +178,76 @@ public class CrystalLink extends JavaPlugin {
                 }
 
                 // Send clickable message to player
+                String prefix = getConfig().getString("messages.prefix",
+                        "<aqua><bold>[CrystalLink] <dark_gray>» <gray>");
+
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<aqua><bold>[CrystalLink] <dark_gray>» <gray>Vinculación Web"));
+                        prefix + getConfig().getString("messages.link-generated", "Vinculación Web")));
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<gray>Haz clic en el siguiente enlace para vincular tu cuenta:"));
+                        "<gray>" + getConfig().getString("messages.link-code",
+                                "Haz clic en el siguiente enlace para vincular tu cuenta:")));
+
+                String hoverText = getConfig().getString("messages.link-hover", "<aqua>Clic para abrir");
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<click:open_url:'" + link + "'><hover:show_text:'<aqua>Clic para abrir'><aqua><u>" + link
+                        "<click:open_url:'" + link + "'><hover:show_text:'" + hoverText + "'><aqua><u>" + link
                                 + "</u></hover></click>"));
+
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<red>Este enlace expira en 10 minutos."));
+                        getConfig().getString("messages.link-expiration", "<red>Este enlace expira en 10 minutos.")));
                 player.sendMessage(net.kyori.adventure.text.Component.empty());
 
             } catch (SQLException e) {
                 player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
-                        "<red>Error al conectar con la base de datos."));
+                        getConfig().getString("messages.db-connection-error",
+                                "<red>Error al conectar con la base de datos.")));
                 e.printStackTrace();
             }
         });
+    }
 
-        return true;
+    // Inner class for PlaceholderAPI expansion
+    public static class CrystalLinkExpansion extends me.clip.placeholderapi.expansion.PlaceholderExpansion {
+        private final CrystalLink plugin;
+
+        public CrystalLinkExpansion(CrystalLink plugin) {
+            this.plugin = plugin;
+        }
+
+        @Override
+        public String getIdentifier() {
+            return "crystallink";
+        }
+
+        @Override
+        public String getAuthor() {
+            return "UltraXn";
+        }
+
+        @Override
+        public String getVersion() {
+            return "1.0";
+        }
+
+        @Override
+        public boolean persist() {
+            return true;
+        }
+
+        @Override
+        public String onPlaceholderRequest(Player player, String identifier) {
+            if (player == null) {
+                return "";
+            }
+
+            // %crystallink_status%
+            if (identifier.equals("status")) {
+                // TODO: Check real verification status from DB when we have the users table
+                // For now, return "Not Verified" or check pending
+                return "Not Verified";
+            }
+
+            return null;
+        }
     }
 }

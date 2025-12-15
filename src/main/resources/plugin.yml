@@ -11,3 +11,8 @@ commands:
     usage: /link
     permission: crystallink.use
     permission-message: No tienes permiso para usar este comando.
+  unlink:
+    description: Desvincula tu cuenta o cancela una solicitud pendiente.
+    usage: /unlink
+    permission: crystallink.use
+    permission-message: No tienes permiso para usar este comando.
