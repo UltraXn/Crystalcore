@@ -124,6 +124,16 @@ public class CrystalLink extends JavaPlugin {
                 stmt.execute();
             }
 
+            // 3. Table for Web-First pending codes
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "CREATE TABLE IF NOT EXISTS pending_web_links (" +
+                            "code VARCHAR(10) PRIMARY KEY, " +
+                            "web_user_id VARCHAR(100), " +
+                            "expires_at BIGINT" +
+                            ");")) {
+                stmt.execute();
+            }
+
             // Migration for code column size
             try (PreparedStatement stmt = conn.prepareStatement(
                     "ALTER TABLE web_verifications MODIFY code VARCHAR(64)")) {
@@ -193,9 +203,87 @@ public class CrystalLink extends JavaPlugin {
             return true;
         }
 
-        // Handle /link
+        // Handle /link [code]
+        if (args.length == 1) {
+            handleLinkCode(player, args[0]);
+            return true;
+        }
+
+        // Handle /link (Generate URL)
         handleLink(player);
         return true;
+    }
+
+    private void handleLinkCode(Player player, String code) {
+        String prefix = getConfig().getString("messages.prefix", "<aqua><bold>[CrystalCore] <dark_gray>» <gray>");
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+            try (Connection conn = dataSource.getConnection()) {
+                // Check if already linked
+                try (PreparedStatement checkStmt = conn
+                        .prepareStatement("SELECT uuid FROM linked_accounts WHERE uuid = ?")) {
+                    checkStmt.setString(1, player.getUniqueId().toString());
+                    if (checkStmt.executeQuery().next()) {
+                        player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                prefix + getConfig().getString("messages.already-linked",
+                                        "<red>Ya tienes una cuenta vinculada. Usa /unlink para desvincularla.")));
+                        return;
+                    }
+                }
+
+                String webUserId = null;
+                // Verify Code
+                try (PreparedStatement stmt = conn
+                        .prepareStatement("SELECT web_user_id, expires_at FROM pending_web_links WHERE code = ?")) {
+                    stmt.setString(1, code);
+                    var rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        long expires = rs.getLong("expires_at");
+                        if (System.currentTimeMillis() > expires) {
+                            player.sendMessage(
+                                    net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                            prefix + "<red>Ese código ha expirado."));
+                            return;
+                        }
+                        webUserId = rs.getString("web_user_id");
+                    } else {
+                        player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                                prefix + "<red>Código inválido. Asegúrate de copiarlo bien."));
+                        return;
+                    }
+                }
+
+                if (webUserId != null) {
+                    // Link it!
+                    try (PreparedStatement insertStmt = conn.prepareStatement(
+                            "INSERT INTO linked_accounts (uuid, player_name, web_user_id) VALUES (?, ?, ?)")) {
+                        insertStmt.setString(1, player.getUniqueId().toString());
+                        insertStmt.setString(2, player.getName());
+                        insertStmt.setString(3, webUserId);
+                        insertStmt.executeUpdate();
+                    }
+
+                    // Cleanup
+                    try (PreparedStatement del = conn
+                            .prepareStatement("DELETE FROM pending_web_links WHERE code = ?")) {
+                        del.setString(1, code);
+                        del.executeUpdate();
+                    }
+
+                    // Success Message
+                    player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                            prefix + "<green>¡Cuenta vinculada exitosamente con la web!"));
+
+                    // Optional: Notification sound
+                    // player.playSound(player.getLocation(),
+                    // org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+                }
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                player.sendMessage(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(
+                        prefix + "<red>Error de base de datos."));
+            }
+        });
     }
 
     private void handleUnlink(Player player) {
