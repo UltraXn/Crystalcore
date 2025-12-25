@@ -1,22 +1,9 @@
-mysql:
-  host: 127.0.0.1
-  port: 3306
-  database: s41940_Base-General
-  username: user
-  password: password
+database:
+  host: "127.0.0.1"
+  port: "3306"
+  name: "your_database"
+  user: "root"
+  password: "password"
 
-domain: "crystaltidesSMP.net"
-
-messages:
-  prefix: "<aqua><bold>[CrystalCore] <dark_gray>» <gray>"
-  only-players: "<red>Este comando solo es para jugadores."
-  db-error: "<red>No has conectado el plugin a la base de datos."
-  link-generated: "Vinculación Web"
-  link-code: "Haz clic en el siguiente enlace para vincular tu cuenta:"
-  link-hover: "<aqua>Clic para abrir"
-  link-expiration: "<red>Este enlace expira en 10 minutos."
-  db-connection-error: "<red>Error al conectar con la base de datos."
-  unlink-success: "<green>Tu solicitud de vinculación ha sido cancelada."
-  unlink-not-found: "<red>No tienes ninguna solicitud pendiente."
-  reload-success: "<green>Configuración recargada y base de datos reconectada."
-  no-permission: "<red>No tienes permiso para usar este comando."
+# Polling interval in ticks (20 ticks = 1 second)
+polling-interval: 200

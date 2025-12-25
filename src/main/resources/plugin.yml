@@ -1,24 +1,20 @@
-name: CrystalLink
+name: CrystalCore
 version: ${project.version}
-main: com.crystaltides.link.CrystalLink
 api-version: "1.21"
-authors: [UltraXn]
-description: Plugin de vinculacion Web-Minecraft para CrystalTides
+main: com.crystaltides.core.CrystalCore
+author: UltraXn & Antigravity
+description: The heart of CrystalTides SMP. Handles linking and web-bridge.
+softdepend: [PlaceholderAPI]
+load: STARTUP
 
 commands:
   link:
-    description: Genera un codigo para vincular tu cuenta en la web.
-    usage: /link
-    permission: crystallink.use
-    permission-message: No tienes permiso para usar este comando.
+    description: Link your account to the website.
+    usage: /link [code]
   unlink:
-    description: Desvincula tu cuenta o cancela una solicitud pendiente.
+    description: Unlink your account.
     usage: /unlink
-    permission: crystallink.use
-    permission-message: No tienes permiso para usar este comando.
-  crystallink:
-    description: Comandos de administración del plugin.
-    usage: /crystallink reload
-    aliases: [cl]
-    permission: crystallink.admin
-    permission-message: No tienes permiso para usar este comando.
+  crystalcore:
+    description: Admin commands for CrystalCore.
+    permission: crystalcore.admin
+    usage: /crystalcore reload
