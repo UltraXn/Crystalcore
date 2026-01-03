@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/bukkit-plugin.json
 name: CrystalCore
 version: ${project.version}
 api-version: "1.21"
@@ -18,3 +19,7 @@ commands:
     description: Admin commands for CrystalCore.
     permission: crystalcore.admin
     usage: /crystalcore reload
+  money:
+    description: Shows your current Killucoins balance.
+    aliases: [balance, bal]
+    usage: /money
