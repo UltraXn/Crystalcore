@@ -1,48 +1,48 @@
 # 💎 CrystalCore
 
-The central **PaperMC plugin** for the _CrystalTides SMP_ server. It handles core game mechanics, economy, custom items, and synchronizes data with the web platform.
+El **plugin central de PaperMC** para el servidor _CrystalTides SMP_. Maneja las mecánicas centrales del juego, economía, ítems personalizados y sincroniza datos con la plataforma web.
 
-## ✨ Features
+## ✨ Características
 
-- **Database Sync**: Supports MySQL/SQLite for persistent player data.
-- **Web Integration**: syncs ranks and stats with the website via WebSocket/Rest.
-- **Economy**: Custom currency handling.
-- **PlaceholderAPI**: Exports custom placeholders for use in other plugins (Tab, Scoreboard).
+- **Sincronización de Base de Datos**: Soporta MySQL/SQLite para datos persistentes de jugadores.
+- **Integración Web**: Sincroniza rangos y estadísticas con la web vía WebSocket/Rest.
+- **Economía**: Manejo de moneda personalizada.
+- **PlaceholderAPI**: Exporta placeholders personalizados para uso en otros plugins (Tab, Scoreboard).
 
-## 🛠️ Build & Install
+## 🛠️ Compilación e Instalación
 
-This project uses **Maven** for dependency management.
+Este proyecto usa **Maven** para la gestión de dependencias.
 
-### Prerequisites
+### Prerrequisitos
 
 - JDK 21
 - Maven
 
-### Building
+### Compilación
 
 ```bash
 mvn clean package
 ```
 
-The output jar will be in `target/CrystalCore-1.4-SNAPSHOT.jar`.
+El jar resultante estará en `target/CrystalCore-1.4-SNAPSHOT.jar`.
 
-## ⚙️ Configuration
+## ⚙️ Configuración
 
-The `config.yml` (generated on first run) handles database connections:
+El archivo `config.yml` (generado en la primera ejecución) maneja las conexiones a base de datos:
 
 ```yaml
 database:
-  type: 'mysql' # or sqlite
+  type: 'mysql' # o sqlite
   host: 'localhost'
   port: 3306
   database: 'crystaltides'
-  username: 'user'
+  username: 'usuario'
   password: 'password'
 ```
 
-## 📦 Dependencies
+## 📦 Dependencias
 
 - **Paper API** (1.21.1)
-- **HikariCP** (Database Pooling)
+- **HikariCP** (Pooling de Base de Datos)
 - **PlaceholderAPI**
 - **Java-WebSocket**
