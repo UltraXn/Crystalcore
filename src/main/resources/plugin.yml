@@ -4,7 +4,7 @@ version: ${project.version}
 api-version: "1.21"
 main: com.crystaltides.core.CrystalCore
 author: UltraXn & Antigravity
-description: The heart of CrystalTides SMP. Handles linking and web-bridge.
+description: El corazón de CrystalTides SMP. Maneja vinculación de cuentas y puente web.
 softdepend: [PlaceholderAPI]
 load: STARTUP
 
