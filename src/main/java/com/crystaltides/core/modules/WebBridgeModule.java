@@ -9,6 +9,11 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -167,9 +172,16 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 stmt.setLong(6, expiresAt);
                 stmt.executeUpdate();
 
-                player.sendMessage("§b[CrystalCore] §7Tu código de vinculación es: §e§l" + code);
-                player.sendMessage("§7Úsalo en Discord (/link) o en la Web para conectar tus cuentas.");
-                player.sendMessage("§8(Expira en 15 minutos)");
+                String codeStr = code.toString();
+                Component message = Component.text("[CrystalCore] ", NamedTextColor.AQUA)
+                        .append(Component.text("Tu código de vinculación es: ", NamedTextColor.GRAY))
+                        .append(Component.text(codeStr, NamedTextColor.YELLOW, TextDecoration.BOLD)
+                                .clickEvent(ClickEvent.copyToClipboard(codeStr))
+                                .hoverEvent(HoverEvent.showText(Component.text("¡Haz clic para copiar el código!", NamedTextColor.GREEN))));
+
+                player.sendMessage(message);
+                player.sendMessage(Component.text("Úsalo en Discord (/link) o en la Web para conectar tus cuentas.", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("(Expira en 15 minutos)", NamedTextColor.DARK_GRAY));
             } catch (SQLException e) {
                 player.sendMessage("§cError al generar código de vinculación.");
                 e.printStackTrace();
