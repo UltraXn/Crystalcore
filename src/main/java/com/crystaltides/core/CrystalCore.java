@@ -88,6 +88,20 @@ public class CrystalCore extends JavaPlugin {
                 }
                 return true;
             }
+            if (args.length > 1 && args[0].equalsIgnoreCase("sync")) {
+                String targetName = args[1];
+                org.bukkit.entity.Player target = org.bukkit.Bukkit.getPlayer(targetName);
+                if (target != null) {
+                    ProfileModule profileModule = moduleManager.getModule(ProfileModule.class);
+                    if (profileModule != null) {
+                        profileModule.reloadProfile(target.getUniqueId());
+                        sender.sendMessage(msgPrefix + "§aPerfil de " + target.getName() + " sincronizado.");
+                    }
+                } else {
+                    sender.sendMessage(msgPrefix + "§cJugador no encontrado o desconectado.");
+                }
+                return true;
+            }
             sender.sendMessage(msgPrefix + "Help:");
             sender.sendMessage(msgPrefix + "§e/crystalcore reload");
             sender.sendMessage(msgPrefix + "§e/crystalcore scan");

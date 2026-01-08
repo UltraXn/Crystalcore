@@ -49,6 +49,16 @@ public class ProfileModule extends CrystalModule {
         return profiles.get(uuid);
     }
 
+    public void reloadProfile(java.util.UUID uuid) {
+        org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(uuid);
+        if (player != null && player.isOnline()) {
+            CrystalProfile newProfile = loadProfile(uuid, player.getName());
+            if (newProfile != null) {
+                profiles.put(uuid, newProfile);
+            }
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onAsyncLogin(AsyncPlayerPreLoginEvent event) {
         if (event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
