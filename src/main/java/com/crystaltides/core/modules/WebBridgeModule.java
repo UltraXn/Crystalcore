@@ -111,6 +111,39 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
     private void processLinkAttempt(Player player, Connection conn, String source, String sourceId, String code)
             throws SQLException {
+
+        String uuidStr = player.getUniqueId().toString();
+        String playerName = player.getName();
+
+        // Robust cleanup to avoid UNIQUE key collisions (web_user_id or discord_id)
+        if (source.equalsIgnoreCase("discord")) {
+            // Unlink anyone else from this discord account
+            try (PreparedStatement clean = conn.prepareStatement(
+                    "UPDATE linked_accounts SET discord_id = NULL, discord_tag = NULL WHERE discord_id = ?")) {
+                clean.setString(1, sourceId);
+                clean.executeUpdate();
+            }
+            // Unlink this player from any other discord
+            try (PreparedStatement clean = conn.prepareStatement(
+                    "UPDATE linked_accounts SET discord_id = NULL, discord_tag = NULL WHERE minecraft_uuid = ?")) {
+                clean.setString(1, uuidStr);
+                clean.executeUpdate();
+            }
+        } else if (source.equalsIgnoreCase("web")) {
+            // Unlink anyone else from this web account
+            try (PreparedStatement clean = conn
+                    .prepareStatement("UPDATE linked_accounts SET web_user_id = NULL WHERE web_user_id = ?")) {
+                clean.setString(1, sourceId);
+                clean.executeUpdate();
+            }
+            // Unlink this player from any other web account
+            try (PreparedStatement clean = conn
+                    .prepareStatement("UPDATE linked_accounts SET web_user_id = NULL WHERE minecraft_uuid = ?")) {
+                clean.setString(1, uuidStr);
+                clean.executeUpdate();
+            }
+        }
+
         String query = "";
         if (source.equalsIgnoreCase("discord")) {
             query = "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, discord_id) VALUES (?, ?, ?) "
@@ -122,12 +155,18 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
         if (!query.isEmpty()) {
             try (PreparedStatement insert = conn.prepareStatement(query)) {
-                insert.setString(1, player.getUniqueId().toString());
-                insert.setString(2, player.getName());
+                insert.setString(1, uuidStr);
+                insert.setString(2, playerName);
                 insert.setString(3, sourceId);
-                insert.setString(4, player.getName());
+                insert.setString(4, playerName);
                 insert.setString(5, sourceId);
                 insert.executeUpdate();
+
+                // Clean up empty rows
+                try (PreparedStatement cleanupEmpty = conn.prepareStatement(
+                        "DELETE FROM linked_accounts WHERE minecraft_uuid IS NULL AND discord_id IS NULL AND web_user_id IS NULL")) {
+                    cleanupEmpty.executeUpdate();
+                }
 
                 // Update Profile Cache
                 CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
@@ -141,9 +180,10 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
                 player.sendMessage("§a¡Cuenta vinculada con " + source + " exitosamente!");
 
-                try (PreparedStatement cleanup = conn.prepareStatement("DELETE FROM universal_links WHERE code = ?")) {
-                    cleanup.setString(1, code.toUpperCase());
-                    cleanup.executeUpdate();
+                try (PreparedStatement cleanupCode = conn
+                        .prepareStatement("DELETE FROM universal_links WHERE code = ?")) {
+                    cleanupCode.setString(1, code.toUpperCase());
+                    cleanupCode.executeUpdate();
                 }
             }
         }
@@ -177,10 +217,12 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                         .append(Component.text("Tu código de vinculación es: ", NamedTextColor.GRAY))
                         .append(Component.text(codeStr, NamedTextColor.YELLOW, TextDecoration.BOLD)
                                 .clickEvent(ClickEvent.copyToClipboard(codeStr))
-                                .hoverEvent(HoverEvent.showText(Component.text("¡Haz clic para copiar el código!", NamedTextColor.GREEN))));
+                                .hoverEvent(HoverEvent.showText(
+                                        Component.text("¡Haz clic para copiar el código!", NamedTextColor.GREEN))));
 
                 player.sendMessage(message);
-                player.sendMessage(Component.text("Úsalo en Discord (/link) o en la Web para conectar tus cuentas.", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("Úsalo en Discord (/link) o en la Web para conectar tus cuentas.",
+                        NamedTextColor.GRAY));
                 player.sendMessage(Component.text("(Expira en 15 minutos)", NamedTextColor.DARK_GRAY));
             } catch (SQLException e) {
                 player.sendMessage("§cError al generar código de vinculación.");

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.crystaltides</groupId>
   <artifactId>CrystalCore</artifactId>
   <name>CrystalCore</name>
-  <version>1.5</version>
+  <version>1.5.1</version>
   <build>
     <defaultGoal>clean package</defaultGoal>
     <resources>
@@ -62,6 +63,12 @@
       <artifactId>mysql-connector-java</artifactId>
       <version>8.0.33</version>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>me.clip</groupId>
+      <artifactId>CrystalCore</artifactId>
+      <version>1.5.1</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>me.clip</groupId>

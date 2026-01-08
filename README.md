@@ -46,3 +46,11 @@ database:
 - **HikariCP** (Pooling de Base de Datos)
 - **PlaceholderAPI**
 - **Java-WebSocket**
+
+## 🏷️ Control de Versiones (Versioning Policy)
+
+Para mantener la consistencia en el desarrollo, seguimos estas reglas de versionado (**X.Y.Z**):
+
+- **X (Major)**: Cambios grandes, "releases" con cambios estructurales fuertes (Ej: `2.5.1`).
+- **Y (Minor)**: Nuevas funcionalidades (features) menores o cambios significativos (Ej: `1.6.1`).
+- **Z (Patch/Hotfix)**: Correcciones de errores menores o parches urgentes (Ej: `1.5.2`).
