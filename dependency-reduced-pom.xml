@@ -4,7 +4,7 @@
   <groupId>com.crystaltides</groupId>
   <artifactId>CrystalCore</artifactId>
   <name>CrystalCore</name>
-  <version>1.4-SNAPSHOT</version>
+  <version>1.5</version>
   <build>
     <defaultGoal>clean package</defaultGoal>
     <resources>
