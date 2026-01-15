@@ -65,28 +65,27 @@ public class BancoModule extends CrystalModule {
         if (!isEnabled())
             return;
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try (Connection conn = sqliteDataSource.getConnection();
-                    PreparedStatement ps = conn
-                            .prepareStatement("SELECT balance FROM accounts WHERE player_name = ?")) {
+        if (Bukkit.isPrimaryThread()) {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> performSync(profile));
+        } else {
+            performSync(profile);
+        }
+    }
 
-                // Assuming 'accounts' table has 'player_name' and 'balance'.
-                // Adjust SQL if Banco uses UUID or different schema.
-                ps.setString(1, profile.getPlayerName());
+    private void performSync(CrystalProfile profile) {
+        try (Connection conn = sqliteDataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement("SELECT balance FROM accounts WHERE player_name = ?")) {
 
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        long balance = rs.getLong("balance");
-                        profile.setKillucoins(balance);
-                        // Optional: Debug log
-                        // plugin.getLogger().info("Synced balance for " + profile.getPlayerName() + ":
-                        // " + balance);
-                    }
+            ps.setString(1, profile.getPlayerName());
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    long balance = rs.getLong("balance");
+                    profile.setKillucoins(balance);
                 }
-            } catch (SQLException e) {
-                plugin.getLogger()
-                        .warning("Error syncing balance for " + profile.getPlayerName() + ": " + e.getMessage());
             }
-        });
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Error syncing balance for " + profile.getPlayerName() + ": " + e.getMessage());
+        }
     }
 }

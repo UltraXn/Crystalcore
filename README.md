@@ -5,7 +5,7 @@ El **plugin central de PaperMC** para el servidor _CrystalTides SMP_. Maneja las
 ## ✨ Características
 
 - **Sincronización de Base de Datos**: Soporta MySQL/SQLite para datos persistentes de jugadores.
-- **Integración Web**: Sincroniza rangos y estadísticas con la web vía WebSocket/Rest.
+- **Integración Web (CrystalBridge)**: Lee y ejecuta comandos asíncronos desde la cola `web_pending_commands` (Inbox Pattern).
 - **Economía**: Manejo de moneda personalizada.
 - **PlaceholderAPI**: Exporta placeholders personalizados para uso en otros plugins (Tab, Scoreboard).
 

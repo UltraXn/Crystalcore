@@ -52,10 +52,12 @@ public class ProfileModule extends CrystalModule {
     public void reloadProfile(java.util.UUID uuid) {
         org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
-            CrystalProfile newProfile = loadProfile(uuid, player.getName());
-            if (newProfile != null) {
-                profiles.put(uuid, newProfile);
-            }
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                CrystalProfile newProfile = loadProfile(uuid, player.getName());
+                if (newProfile != null) {
+                    profiles.put(uuid, newProfile);
+                }
+            });
         }
     }
 

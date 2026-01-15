@@ -21,10 +21,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.logging.Level;
 
+import java.net.URI;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
 public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
     private DatabaseModule databaseModule;
     private ProfileModule profileModule;
+    private WebSocketClient wsClient;
 
     public WebBridgeModule(CrystalCore plugin) {
         super(plugin, "WebBridge");
@@ -45,11 +50,67 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
         startCleanupTask();
         startCommandQueueTask();
+        connectWebSocket();
     }
 
     @Override
     public void onDisable() {
+        if (wsClient != null) {
+            wsClient.close();
+        }
         super.onDisable();
+    }
+
+    private void connectWebSocket() {
+        try {
+            // Default to local dev server, should be configurable
+            String wsUrl = plugin.getConfig().getString("websocket-url", "ws://localhost:3001");
+            URI uri = new URI(wsUrl);
+
+            wsClient = new WebSocketClient(uri) {
+                @Override
+                public void onOpen(ServerHandshake handshakedata) {
+                    plugin.getLogger().info("✅ Connected to Web Bridge via WebSocket!");
+                    wsClient.send("ping"); // Handshake/Auth could go here
+                }
+
+                @Override
+                public void onMessage(String message) {
+                    // Check for command refresh signal
+                    if (message.contains("REFRESH_COMMANDS")) {
+                        // Use main thread scheduler to ensure sync if needed,
+                        // though checkForCommands runs async DB queries.
+                        // We run it async immediately.
+                        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> checkForCommands());
+                    } else if (message.equals("pong")) {
+                        // Heartbeat response
+                    }
+                }
+
+                @Override
+                public void onClose(int code, String reason, boolean remote) {
+                    plugin.getLogger().warning("❌ WebSocket closed: " + reason);
+                    // Simple reconnect logic with delay
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            if (plugin.isEnabled()) {
+                                connectWebSocket();
+                            }
+                        }
+                    }.runTaskLater(plugin, 100L); // 5 seconds
+                }
+
+                @Override
+                public void onError(Exception ex) {
+                    plugin.getLogger().warning("WebSocket Error: " + ex.getMessage());
+                }
+            };
+
+            wsClient.connect();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to connect WebSocket", e);
+        }
     }
 
     @Override
@@ -169,14 +230,17 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 }
 
                 // Update Profile Cache
-                CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
-                if (profile != null) {
-                    profile.setLinked(true);
-                    if (source.equalsIgnoreCase("discord"))
-                        profile.setDiscordId(sourceId);
-                    if (source.equalsIgnoreCase("web"))
-                        profile.setWebUserId(sourceId);
-                }
+                // Update Profile Cache (SYNC TASK for Thread Safety)
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
+                    if (profile != null) {
+                        profile.setLinked(true);
+                        if (source.equalsIgnoreCase("discord"))
+                            profile.setDiscordId(sourceId);
+                        if (source.equalsIgnoreCase("web"))
+                            profile.setWebUserId(sourceId);
+                    }
+                });
 
                 player.sendMessage("§a¡Cuenta vinculada con " + source + " exitosamente!");
 
@@ -238,12 +302,14 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                             .prepareStatement("DELETE FROM linked_accounts WHERE minecraft_uuid = ?")) {
                 stmt.setString(1, player.getUniqueId().toString());
                 if (stmt.executeUpdate() > 0) {
-                    CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
-                    if (profile != null) {
-                        profile.setLinked(false);
-                        profile.setDiscordId(null);
-                        profile.setWebUserId(null);
-                    }
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
+                        if (profile != null) {
+                            profile.setLinked(false);
+                            profile.setDiscordId(null);
+                            profile.setWebUserId(null);
+                        }
+                    });
                     player.sendMessage("§aCuenta desvinculada.");
                 } else {
                     player.sendMessage("§cNo tienes una cuenta vinculada.");
@@ -272,30 +338,36 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
     }
 
     private void startCommandQueueTask() {
-        long interval = plugin.getConfig().getLong("polling-interval", 40L);
+        // Reduced polling frequency significantly since we use WebSockets (Backup
+        // polling)
+        // 200 ticks = 10 seconds (vs 2s before)
         new BukkitRunnable() {
             @Override
             public void run() {
-                try (Connection conn = databaseModule.getConnection();
-                        PreparedStatement psSelection = conn.prepareStatement(
-                                "SELECT id, command FROM web_pending_commands WHERE executed = FALSE ORDER BY created_at ASC LIMIT 5");
-                        ResultSet rs = psSelection.executeQuery()) {
-
-                    while (rs.next()) {
-                        int id = rs.getInt("id");
-                        String cmd = rs.getString("command");
-
-                        Bukkit.getScheduler().runTask(plugin, () -> {
-                            plugin.getLogger().info("⚡ Executing web command: " + cmd);
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
-                            markCommandAsExecuted(id);
-                        });
-                    }
-                } catch (SQLException e) {
-                    plugin.getLogger().log(Level.WARNING, "Error querying command queue", e);
-                }
+                checkForCommands();
             }
-        }.runTaskTimerAsynchronously(plugin, 100L, interval);
+        }.runTaskTimerAsynchronously(plugin, 100L, 200L);
+    }
+
+    private void checkForCommands() {
+        try (Connection conn = databaseModule.getConnection();
+                PreparedStatement psSelection = conn.prepareStatement(
+                        "SELECT id, command FROM web_pending_commands WHERE executed = FALSE ORDER BY created_at ASC LIMIT 5");
+                ResultSet rs = psSelection.executeQuery()) {
+
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String cmd = rs.getString("command");
+
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    plugin.getLogger().info("⚡ Executing web command: " + cmd);
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
+                    markCommandAsExecuted(id);
+                });
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error querying command queue", e);
+        }
     }
 
     private void markCommandAsExecuted(int id) {

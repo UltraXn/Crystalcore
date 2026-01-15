@@ -1,5 +1,7 @@
 package com.crystaltides.core.modules;
 
+import org.bukkit.Bukkit;
+
 import com.crystaltides.core.CrystalCore;
 import com.crystaltides.core.api.CrystalModule;
 import org.bukkit.Material;
@@ -66,9 +68,18 @@ public class GachaModule extends CrystalModule {
         if (!isEnabled())
             return;
 
+        // Inventory access MUST be on the main thread
+        if (!Bukkit.isPrimaryThread()) {
+            Bukkit.getScheduler().runTask(plugin, () -> performScan(player));
+        } else {
+            performScan(player);
+        }
+    }
+
+    private void performScan(Player player) {
         Set<String> foundTiers = new HashSet<>();
 
-        // Scan Inventory
+        // Scan Inventory (Main Thread)
         for (ItemStack item : player.getInventory().getContents()) {
             if (item != null && item.getType() != Material.AIR && item.hasItemMeta()
                     && item.getItemMeta().hasCustomModelData()) {
@@ -80,7 +91,8 @@ public class GachaModule extends CrystalModule {
         }
 
         if (!foundTiers.isEmpty()) {
-            updateDatabase(player.getUniqueId(), foundTiers);
+            // Update Database (Async Thread)
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> updateDatabase(player.getUniqueId(), foundTiers));
         }
     }
 

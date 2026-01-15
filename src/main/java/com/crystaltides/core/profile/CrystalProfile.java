@@ -8,15 +8,15 @@ public class CrystalProfile {
     private final String playerName;
 
     // Status
-    private boolean linked;
-    private String discordId;
-    private String webUserId;
+    private volatile boolean linked;
+    private volatile String discordId;
+    private volatile String webUserId;
 
     // Stats
-    private long lastSeen;
+    private volatile long lastSeen;
 
     // Economy (Future placeholder)
-    private long killucoins;
+    private volatile long killucoins;
 
     public CrystalProfile(UUID uuid, String playerName) {
         this.uuid = uuid;
