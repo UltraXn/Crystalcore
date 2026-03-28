@@ -86,6 +86,10 @@ public class DatabaseModule extends CrystalModule {
                             "web_user_id VARCHAR(100) UNIQUE, " +
                             "gacha_balance BIGINT DEFAULT 0, " +
                             "unlocked_tiers TEXT, " +
+                            "blocks_mined INT DEFAULT 0, " +
+                            "kills INT DEFAULT 0, " +
+                            "deaths INT DEFAULT 0, " +
+                            "last_seen BIGINT DEFAULT 0, " +
                             "linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
                     .execute();
 

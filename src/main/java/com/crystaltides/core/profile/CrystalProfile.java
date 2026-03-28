@@ -14,6 +14,9 @@ public class CrystalProfile {
 
     // Stats
     private volatile long lastSeen;
+    private volatile int blocksMined;
+    private volatile int kills;
+    private volatile int deaths;
 
     // Economy (Future placeholder)
     private volatile long killucoins;
@@ -23,6 +26,9 @@ public class CrystalProfile {
         this.playerName = playerName;
         this.linked = false;
         this.lastSeen = System.currentTimeMillis();
+        this.blocksMined = 0;
+        this.kills = 0;
+        this.deaths = 0;
     }
 
     public UUID getUuid() {
@@ -71,5 +77,41 @@ public class CrystalProfile {
 
     public void setKillucoins(long killucoins) {
         this.killucoins = killucoins;
+    }
+
+    public int getBlocksMined() {
+        return blocksMined;
+    }
+
+    public void setBlocksMined(int blocksMined) {
+        this.blocksMined = blocksMined;
+    }
+
+    public void addBlockMined() {
+        this.blocksMined++;
+    }
+
+    public int getKills() {
+        return kills;
+    }
+
+    public void setKills(int kills) {
+        this.kills = kills;
+    }
+
+    public void addKill() {
+        this.kills++;
+    }
+
+    public int getDeaths() {
+        return deaths;
+    }
+
+    public void setDeaths(int deaths) {
+        this.deaths = deaths;
+    }
+
+    public void addDeath() {
+        this.deaths++;
     }
 }

@@ -5,6 +5,13 @@ database:
   user: "root"
   password: "password"
 
+redis:
+  enabled: true
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+  timeout: 2000
+
 # Polling interval in ticks (20 ticks = 1 second)
 polling-interval: 40
 

@@ -8,6 +8,7 @@ import com.crystaltides.core.modules.BancoModule;
 import com.crystaltides.core.modules.StaffStatusModule;
 import com.crystaltides.core.modules.GachaModule;
 import com.crystaltides.core.modules.WebSocketModule;
+import com.crystaltides.core.modules.RedisModule;
 import com.crystaltides.core.commands.MoneyCommand;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -25,6 +26,7 @@ public class CrystalCore extends JavaPlugin {
 
         // Register Modules (Order matters for dependencies)
         moduleManager.registerModule(new DatabaseModule(this));
+        moduleManager.registerModule(new RedisModule(this));
         // Banco Bridge (SQLite Economy)
         moduleManager.registerModule(new BancoModule(this));
         // Staff Status System

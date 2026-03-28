@@ -15,6 +15,7 @@ import java.util.UUID;
 public class StaffStatusModule extends CrystalModule {
 
     private DatabaseModule databaseModule;
+    private RedisModule redisModule;
     private final String SERVER_NAME = "survival"; // Can be moved to config later
 
     public StaffStatusModule(CrystalCore plugin) {
@@ -28,6 +29,8 @@ public class StaffStatusModule extends CrystalModule {
             plugin.getLogger().severe("StaffStatusModule requires DatabaseModule!");
             return;
         }
+
+        this.redisModule = plugin.getModuleManager().getModule(RedisModule.class);
 
         // Verify Table
         try (Connection conn = databaseModule.getConnection()) {
@@ -77,7 +80,27 @@ public class StaffStatusModule extends CrystalModule {
 
                 ps.executeUpdate();
             } catch (SQLException e) {
-                plugin.getLogger().warning("Failed to update staff status for " + name + ": " + e.getMessage());
+                plugin.getLogger().warning("Failed to update staff status in MySQL for " + name + ": " + e.getMessage());
+            }
+
+            // Update Redis if enabled
+            if (redisModule != null && redisModule.isRedisEnabled()) {
+                try (redis.clients.jedis.Jedis jedis = redisModule.getResource()) {
+                    if (jedis != null) {
+                        String key = "staff_status:" + uuid.toString();
+                        java.util.Map<String, String> data = new java.util.HashMap<>();
+                        data.put("name", name);
+                        data.put("status", status);
+                        data.put("server_id", SERVER_NAME);
+                        data.put("last_update", String.valueOf(System.currentTimeMillis()));
+
+                        jedis.hset(key, data);
+                        // Also update a global online staff set or hash if needed
+                        jedis.hset("staff_online", uuid.toString(), status);
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to update staff status in Redis for " + name + ": " + e.getMessage());
+                }
             }
         });
     }
