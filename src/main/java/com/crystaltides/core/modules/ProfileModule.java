@@ -8,6 +8,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.entity.Player;
 import redis.clients.jedis.Jedis;
@@ -16,6 +17,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +38,8 @@ public class ProfileModule extends CrystalModule {
         this.databaseModule = plugin.getModuleManager().getModule(DatabaseModule.class);
         this.redisModule = plugin.getModuleManager().getModule(RedisModule.class);
         
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
         if (databaseModule == null) {
             plugin.getLogger().severe("ProfileModule requires DatabaseModule, but it's not loaded!");
         }
@@ -62,8 +66,8 @@ public class ProfileModule extends CrystalModule {
         return profiles.get(uuid);
     }
 
-    public void reloadProfile(java.util.UUID uuid) {
-        org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(uuid);
+    public void reloadProfile(UUID uuid) {
+        Player player = plugin.getServer().getPlayer(uuid);
         if (player != null && player.isOnline()) {
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
                 CrystalProfile newProfile = loadProfile(uuid, player.getName());
@@ -80,19 +84,11 @@ public class ProfileModule extends CrystalModule {
             return;
         }
 
-        // Load data BEFORE join
         UUID uuid = event.getUniqueId();
         String name = event.getName();
 
         CrystalProfile profile = loadProfile(uuid, name);
-        if (profile != null) {
-            profiles.put(uuid, profile);
-            // Update database last seen immediately or on quit?
-            // Let's keep it simple for now and just load.
-        } else {
-            // Create new empty profile if load failed (or handle error)
-            profiles.put(uuid, new CrystalProfile(uuid, name));
-        }
+        profiles.put(uuid, profile);
     }
 
     @EventHandler
@@ -116,12 +112,24 @@ public class ProfileModule extends CrystalModule {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        CrystalProfile profile = getProfile(event.getPlayer().getUniqueId());
+        if (profile != null) {
+            profile.addBlockPlaced();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityDeath(EntityDeathEvent event) {
         Player killer = event.getEntity().getKiller();
         if (killer != null) {
             CrystalProfile killerProfile = getProfile(killer.getUniqueId());
             if (killerProfile != null) {
-                killerProfile.addKill();
+                if (event.getEntity() instanceof Player) {
+                    killerProfile.addKill();
+                } else {
+                    killerProfile.addMobKill();
+                }
             }
         }
 
@@ -136,20 +144,28 @@ public class ProfileModule extends CrystalModule {
     private void pushToRedis(CrystalProfile profile) {
         if (redisModule == null || !redisModule.isRedisEnabled()) return;
 
-        profile.setLastSeen(System.currentTimeMillis()); // Update timestamp
+        profile.setLastSeen(System.currentTimeMillis());
         try (Jedis jedis = redisModule.getResource()) {
             if (jedis == null) return;
 
             String key = "player:stats:" + profile.getUuid().toString();
-            Map<String, String> stats = new java.util.HashMap<>();
+            Map<String, String> stats = new HashMap<>();
             stats.put("name", profile.getPlayerName());
             stats.put("blocksMined", String.valueOf(profile.getBlocksMined()));
+            stats.put("blocksPlaced", String.valueOf(profile.getBlocksPlaced()));
             stats.put("kills", String.valueOf(profile.getKills()));
+            stats.put("mobKills", String.valueOf(profile.getMobKills()));
             stats.put("deaths", String.valueOf(profile.getDeaths()));
+            stats.put("playtimeSeconds", String.valueOf(profile.getPlaytimeSeconds()));
+            stats.put("streakDays", String.valueOf(profile.getStreakDays()));
+            stats.put("killucoins", String.valueOf(profile.getKillucoins()));
             stats.put("lastSeen", String.valueOf(profile.getLastSeen()));
             
             jedis.hmset(key, stats);
             jedis.expire(key, 3600); // 1 hour TTL
+            
+            // Set mapping from username to UUID key
+            jedis.set("player:uuid:" + profile.getPlayerName().toLowerCase(), profile.getUuid().toString());
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to push stats to Redis for " + profile.getPlayerName() + ": " + e.getMessage());
         }
@@ -161,10 +177,9 @@ public class ProfileModule extends CrystalModule {
 
         CrystalProfile profile = new CrystalProfile(uuid, name);
 
-        // 1. Load Link Data (MySQL)
         try (Connection conn = databaseModule.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "SELECT discord_id, web_user_id, blocks_mined, kills, deaths FROM linked_accounts WHERE minecraft_uuid = ?")) {
+                        "SELECT discord_id, web_user_id, blocks_mined, kills, deaths, gacha_balance FROM linked_accounts WHERE minecraft_uuid = ?")) {
 
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -175,13 +190,13 @@ public class ProfileModule extends CrystalModule {
                     profile.setBlocksMined(rs.getInt("blocks_mined"));
                     profile.setKills(rs.getInt("kills"));
                     profile.setDeaths(rs.getInt("deaths"));
+                    profile.setKillucoins(rs.getLong("gacha_balance"));
                 }
             }
         } catch (SQLException e) {
             plugin.getLogger().warning("Failed to load profile for " + name + ": " + e.getMessage());
         }
 
-        // 2. Load Economy Data (SQLite via BancoModule)
         BancoModule bancoModule = plugin.getModuleManager().getModule(BancoModule.class);
         if (bancoModule != null && bancoModule.isEnabled()) {
             bancoModule.syncProfile(profile);
@@ -195,13 +210,14 @@ public class ProfileModule extends CrystalModule {
 
         try (Connection conn = databaseModule.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE linked_accounts SET blocks_mined = ?, kills = ?, deaths = ?, last_seen = ? WHERE minecraft_uuid = ?")) {
+                     "UPDATE linked_accounts SET blocks_mined = ?, kills = ?, deaths = ?, last_seen = ?, gacha_balance = ? WHERE minecraft_uuid = ?")) {
             
             ps.setInt(1, profile.getBlocksMined());
             ps.setInt(2, profile.getKills());
             ps.setInt(3, profile.getDeaths());
             ps.setLong(4, profile.getLastSeen());
-            ps.setString(5, profile.getUuid().toString());
+            ps.setLong(5, profile.getKillucoins());
+            ps.setString(6, profile.getUuid().toString());
             
             ps.executeUpdate();
         } catch (SQLException e) {

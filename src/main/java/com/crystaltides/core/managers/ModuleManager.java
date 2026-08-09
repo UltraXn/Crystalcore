@@ -25,8 +25,7 @@ public class ModuleManager {
                 try {
                     module.onEnable();
                 } catch (Exception e) {
-                    plugin.getLogger().severe("Failed to enable module " + module.getName() + ": " + e.getMessage());
-                    e.printStackTrace();
+                    plugin.getSLF4JLogger().error("Failed to enable module " + module.getName(), e);
                 }
             }
         }

@@ -5,7 +5,7 @@ api-version: "1.21"
 main: com.crystaltides.core.CrystalCore
 author: UltraXn & Antigravity
 description: El corazón de CrystalTides SMP. Maneja vinculación de cuentas y puente web.
-softdepend: [PlaceholderAPI]
+softdepend: [PlaceholderAPI, Vault]
 load: STARTUP
 
 commands:
@@ -23,3 +23,24 @@ commands:
     description: Shows your current Killucoins balance.
     aliases: [balance, bal]
     usage: /money
+  duelo:
+    description: Desafía al Maestro de Armas actual a un duelo 1v1 oficial por el título supremo.
+    aliases: [duel]
+    usage: /duelo [retar|aceptar|campeon] <jugador>
+  rules:
+    description: Muestra la URL y resumen de las reglas oficiales de CrystalTides SMP.
+    aliases: [reglas, normas]
+    usage: /rules
+  report:
+    description: Envía un reporte sobre un jugador al staff y discord.
+    aliases: [reportar]
+    usage: /report <jugador> <motivo>
+  lang:
+    description: Cambia tu idioma preferido del servidor (es / en).
+    aliases: [language, idioma]
+    usage: /lang [es|en]
+  misiones:
+    description: Muestra las misiones diarias generadas por el Dungeon Master de la IA.
+    aliases: [misión, mision, quests, quest]
+    usage: /misiones
+

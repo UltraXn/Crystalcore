@@ -17,6 +17,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.logging.Level;
 
 public class GachaModule extends CrystalModule {
 
@@ -53,15 +54,13 @@ public class GachaModule extends CrystalModule {
                 }
             }
         }
-        plugin.getLogger().info("Loaded " + modelDataToTier.size() + " gacha items mappings.");
+        plugin.getLogger().log(Level.INFO, "Loaded {0} gacha items mappings.", modelDataToTier.size());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         // Run scan with a slight delay to ensure inventory is fully loaded/handled
-        plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, () -> scanAndSync(event.getPlayer()), 40L); // 2
-                                                                                                                         // seconds
-                                                                                                                         // delay
+        plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin, () -> scanAndSync(event.getPlayer()), 40L);
     }
 
     public void scanAndSync(Player player) {
@@ -96,53 +95,39 @@ public class GachaModule extends CrystalModule {
         }
     }
 
-    private void updateDatabase(UUID uuid, Set<String> newTiers) {
-        try (Connection conn = databaseModule.getConnection()) {
-            // 1. Get current unlocked tiers
-            Set<String> currentTiers = new HashSet<>();
-            String currentJson = "";
-
-            try (PreparedStatement ps = conn
-                    .prepareStatement("SELECT unlocked_tiers FROM linked_accounts WHERE minecraft_uuid = ?")) {
-                ps.setString(1, uuid.toString());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        currentJson = rs.getString("unlocked_tiers");
-                        if (currentJson != null && !currentJson.isEmpty()) {
-                            // Assuming comma separated for simplicity "bronce,plata"
-                            // If it matches array format like ["a","b"], we might need parsing.
-                            // Let's stick to simple comma separated string for now.
-                            String[] parts = currentJson.replace("[", "").replace("]", "").replace("\"", "").split(",");
-                            for (String s : parts) {
-                                if (!s.trim().isEmpty())
-                                    currentTiers.add(s.trim());
+    private Set<String> fetchCurrentTiers(Connection conn, UUID uuid) throws SQLException {
+        Set<String> currentTiers = new HashSet<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT unlocked_tiers FROM linked_accounts WHERE minecraft_uuid = ?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String currentJson = rs.getString("unlocked_tiers");
+                    if (currentJson != null && !currentJson.isEmpty()) {
+                        String[] parts = currentJson.replace("[", "").replace("]", "").replace("\"", "").split(",");
+                        for (String s : parts) {
+                            if (!s.trim().isEmpty()) {
+                                currentTiers.add(s.trim());
                             }
                         }
-                    } else {
-                        // User not linked or not in DB, skip
-                        return;
                     }
                 }
             }
+        }
+        return currentTiers;
+    }
 
-            // 2. Add new tiers
-            boolean changed = false;
-            for (String tier : newTiers) {
-                if (!currentTiers.contains(tier)) {
-                    currentTiers.add(tier);
-                    changed = true;
-                }
-            }
+    private void updateDatabase(UUID uuid, Set<String> newTiers) {
+        try (Connection conn = databaseModule.getConnection()) {
+            Set<String> currentTiers = fetchCurrentTiers(conn, uuid);
+            boolean changed = currentTiers.addAll(newTiers);
 
-            // 3. Save if changed
             if (changed) {
                 String updatedString = String.join(",", currentTiers);
-                try (PreparedStatement ps = conn
-                        .prepareStatement("UPDATE linked_accounts SET unlocked_tiers = ? WHERE minecraft_uuid = ?")) {
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE linked_accounts SET unlocked_tiers = ? WHERE minecraft_uuid = ?")) {
                     ps.setString(1, updatedString);
                     ps.setString(2, uuid.toString());
                     ps.executeUpdate();
-                    plugin.getLogger().info("Updated tiers for " + uuid + ": " + updatedString);
+                    plugin.getLogger().log(Level.INFO, "Updated tiers for {0}: {1}", new Object[]{uuid, updatedString});
                 }
             }
         } catch (SQLException e) {

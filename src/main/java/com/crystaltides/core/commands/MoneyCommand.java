@@ -26,6 +26,10 @@ public class MoneyCommand implements CommandExecutor {
             return true;
         }
 
+        if (args.length > 0) {
+            return false;
+        }
+
         Player player = (Player) sender;
         ProfileModule profileModule = plugin.getModuleManager().getModule(ProfileModule.class);
 

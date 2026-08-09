@@ -22,6 +22,13 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 
 import java.net.URI;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -43,6 +50,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
         plugin.getCommand("link").setExecutor(this);
         plugin.getCommand("unlink").setExecutor(this);
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new CrystalCoreExpansion(plugin).register();
@@ -89,7 +97,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
-                    plugin.getLogger().warning("❌ WebSocket closed: " + reason);
+                    plugin.getLogger().warning(() -> "❌ WebSocket closed: " + reason);
                     // Simple reconnect logic with delay
                     new BukkitRunnable() {
                         @Override
@@ -165,10 +173,13 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 }
             } catch (SQLException e) {
                 player.sendMessage("§cError de base de datos durante el enlace.");
-                e.printStackTrace();
+                plugin.getLogger().log(Level.WARNING, "Error durante enlace de cuenta para {0}", player.getName());
             }
         });
     }
+
+    private static final String SOURCE_DISCORD = "discord";
+    private static final String SOURCE_WEB = "web";
 
     private void processLinkAttempt(Player player, Connection conn, String source, String sourceId, String code)
             throws SQLException {
@@ -176,79 +187,90 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
         String uuidStr = player.getUniqueId().toString();
         String playerName = player.getName();
 
-        // Robust cleanup to avoid UNIQUE key collisions (web_user_id or discord_id)
-        if (source.equalsIgnoreCase("discord")) {
-            // Unlink anyone else from this discord account
+        cleanPreviousLinks(conn, source, sourceId, uuidStr);
+        executeLinkInsert(player, conn, source, sourceId, code, uuidStr, playerName);
+    }
+
+    private void cleanPreviousLinks(Connection conn, String source, String sourceId, String uuidStr) throws SQLException {
+        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
             try (PreparedStatement clean = conn.prepareStatement(
                     "UPDATE linked_accounts SET discord_id = NULL, discord_tag = NULL WHERE discord_id = ?")) {
                 clean.setString(1, sourceId);
                 clean.executeUpdate();
             }
-            // Unlink this player from any other discord
             try (PreparedStatement clean = conn.prepareStatement(
                     "UPDATE linked_accounts SET discord_id = NULL, discord_tag = NULL WHERE minecraft_uuid = ?")) {
                 clean.setString(1, uuidStr);
                 clean.executeUpdate();
             }
-        } else if (source.equalsIgnoreCase("web")) {
-            // Unlink anyone else from this web account
+        } else if (source.equalsIgnoreCase(SOURCE_WEB)) {
             try (PreparedStatement clean = conn
                     .prepareStatement("UPDATE linked_accounts SET web_user_id = NULL WHERE web_user_id = ?")) {
                 clean.setString(1, sourceId);
                 clean.executeUpdate();
             }
-            // Unlink this player from any other web account
             try (PreparedStatement clean = conn
                     .prepareStatement("UPDATE linked_accounts SET web_user_id = NULL WHERE minecraft_uuid = ?")) {
                 clean.setString(1, uuidStr);
                 clean.executeUpdate();
             }
         }
+    }
 
-        String query = "";
-        if (source.equalsIgnoreCase("discord")) {
-            query = "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, discord_id) VALUES (?, ?, ?) "
+    private String getLinkInsertQuery(String source) {
+        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
+            return "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, discord_id) VALUES (?, ?, ?) "
                     + "ON DUPLICATE KEY UPDATE minecraft_name = ?, discord_id = ?";
-        } else if (source.equalsIgnoreCase("web")) {
-            query = "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, web_user_id) VALUES (?, ?, ?) "
+        }
+        if (source.equalsIgnoreCase(SOURCE_WEB)) {
+            return "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, web_user_id) VALUES (?, ?, ?) "
                     + "ON DUPLICATE KEY UPDATE minecraft_name = ?, web_user_id = ?";
         }
+        return "";
+    }
 
-        if (!query.isEmpty()) {
-            try (PreparedStatement insert = conn.prepareStatement(query)) {
-                insert.setString(1, uuidStr);
-                insert.setString(2, playerName);
-                insert.setString(3, sourceId);
-                insert.setString(4, playerName);
-                insert.setString(5, sourceId);
-                insert.executeUpdate();
+    private void updateProfileOnLink(Player player, String source, String sourceId) {
+        ProfileModule pm = profileModule != null ? profileModule : plugin.getModuleManager().getModule(ProfileModule.class);
+        if (pm == null) return;
+        CrystalProfile profile = pm.getProfile(player.getUniqueId());
+        if (profile == null) return;
 
-                // Clean up empty rows
-                try (PreparedStatement cleanupEmpty = conn.prepareStatement(
-                        "DELETE FROM linked_accounts WHERE minecraft_uuid IS NULL AND discord_id IS NULL AND web_user_id IS NULL")) {
-                    cleanupEmpty.executeUpdate();
-                }
+        profile.setLinked(true);
+        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
+            profile.setDiscordId(sourceId);
+        } else if (source.equalsIgnoreCase(SOURCE_WEB)) {
+            profile.setWebUserId(sourceId);
+        }
+    }
 
-                // Update Profile Cache
-                // Update Profile Cache (SYNC TASK for Thread Safety)
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
-                    if (profile != null) {
-                        profile.setLinked(true);
-                        if (source.equalsIgnoreCase("discord"))
-                            profile.setDiscordId(sourceId);
-                        if (source.equalsIgnoreCase("web"))
-                            profile.setWebUserId(sourceId);
-                    }
-                });
+    private void executeLinkInsert(Player player, Connection conn, String source, String sourceId, String code,
+            String uuidStr, String playerName) throws SQLException {
+        String query = getLinkInsertQuery(source);
+        if (query.isEmpty()) {
+            return;
+        }
 
-                player.sendMessage("§a¡Cuenta vinculada con " + source + " exitosamente!");
+        try (PreparedStatement insert = conn.prepareStatement(query)) {
+            insert.setString(1, uuidStr);
+            insert.setString(2, playerName);
+            insert.setString(3, sourceId);
+            insert.setString(4, playerName);
+            insert.setString(5, sourceId);
+            insert.executeUpdate();
 
-                try (PreparedStatement cleanupCode = conn
-                        .prepareStatement("DELETE FROM universal_links WHERE code = ?")) {
-                    cleanupCode.setString(1, code.toUpperCase());
-                    cleanupCode.executeUpdate();
-                }
+            try (PreparedStatement cleanupEmpty = conn.prepareStatement(
+                    "DELETE FROM linked_accounts WHERE minecraft_uuid IS NULL AND discord_id IS NULL AND web_user_id IS NULL")) {
+                cleanupEmpty.executeUpdate();
+            }
+
+            Bukkit.getScheduler().runTask(plugin, () -> updateProfileOnLink(player, source, sourceId));
+
+            player.sendMessage("§a¡Cuenta vinculada con " + source + " exitosamente!");
+
+            try (PreparedStatement cleanupCode = conn
+                    .prepareStatement("DELETE FROM universal_links WHERE code = ?")) {
+                cleanupCode.setString(1, code.toUpperCase());
+                cleanupCode.executeUpdate();
             }
         }
     }
@@ -257,7 +279,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
             StringBuilder code = new StringBuilder();
-            java.util.Random rnd = new java.util.Random();
+            java.util.concurrent.ThreadLocalRandom rnd = java.util.concurrent.ThreadLocalRandom.current();
             for (int i = 0; i < 6; i++) {
                 code.append(chars.charAt(rnd.nextInt(chars.length())));
             }
@@ -290,34 +312,41 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 player.sendMessage(Component.text("(Expira en 15 minutos)", NamedTextColor.DARK_GRAY));
             } catch (SQLException e) {
                 player.sendMessage("§cError al generar código de vinculación.");
-                e.printStackTrace();
+                plugin.getLogger().log(Level.WARNING, "Error generando código de vinculación", e);
             }
         });
     }
 
+    private void updateProfileOnUnlink(Player player) {
+        ProfileModule pm = profileModule != null ? profileModule : plugin.getModuleManager().getModule(ProfileModule.class);
+        if (pm == null) return;
+        CrystalProfile profile = pm.getProfile(player.getUniqueId());
+        if (profile == null) return;
+
+        profile.setLinked(false);
+        profile.setDiscordId(null);
+        profile.setWebUserId(null);
+    }
+
     private void handleUnlink(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try (Connection conn = databaseModule.getConnection();
-                    PreparedStatement stmt = conn
-                            .prepareStatement("DELETE FROM linked_accounts WHERE minecraft_uuid = ?")) {
-                stmt.setString(1, player.getUniqueId().toString());
-                if (stmt.executeUpdate() > 0) {
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        CrystalProfile profile = profileModule.getProfile(player.getUniqueId());
-                        if (profile != null) {
-                            profile.setLinked(false);
-                            profile.setDiscordId(null);
-                            profile.setWebUserId(null);
-                        }
-                    });
-                    player.sendMessage("§aCuenta desvinculada.");
-                } else {
-                    player.sendMessage("§cNo tienes una cuenta vinculada.");
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> performUnlink(player));
+    }
+
+    private void performUnlink(Player player) {
+        try (Connection conn = databaseModule.getConnection();
+                PreparedStatement stmt = conn
+                        .prepareStatement("DELETE FROM linked_accounts WHERE minecraft_uuid = ?")) {
+            stmt.setString(1, player.getUniqueId().toString());
+            boolean unlinked = stmt.executeUpdate() > 0;
+            if (unlinked) {
+                Bukkit.getScheduler().runTask(plugin, () -> updateProfileOnUnlink(player));
+                player.sendMessage("§aCuenta desvinculada.");
+            } else {
+                player.sendMessage("§cNo tienes una cuenta vinculada.");
             }
-        });
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error al desvincular cuenta", e);
+        }
     }
 
     private void startCleanupTask() {
@@ -370,6 +399,101 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
         }
     }
 
+    @SuppressWarnings("deprecation")
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerChat(AsyncPlayerChatEvent event) {
+        final Player player = event.getPlayer();
+        final String playerName = player.getName();
+        final String messageText = event.getMessage();
+
+        String skinName = playerName;
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            try {
+                // 1. Check for custom texture URL (Skindex / MineSkin / custom URLs)
+                String textureUrl = me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(player, "%skinrestorer_skin_url%");
+                if (textureUrl != null && !textureUrl.isEmpty() && !textureUrl.startsWith("%")) {
+                    int lastSlash = textureUrl.lastIndexOf('/');
+                    if (lastSlash != -1 && lastSlash < textureUrl.length() - 1) {
+                        skinName = textureUrl.substring(lastSlash + 1);
+                    }
+                } else {
+                    // 2. Fallback to skin name
+                    String parsed = me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(player, "%skinrestorer_skin%");
+                    if (parsed != null && !parsed.isEmpty() && !parsed.startsWith("%")) {
+                        skinName = parsed;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Fallback to playerName if PAPI/SkinRestorer is unavailable
+            }
+        }
+
+        final String avatarSkin = skinName;
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            sendChatToDiscordBridge(playerName, avatarSkin, messageText);
+        });
+    }
+
+    private void sendChatToDiscordBridge(String playerName, String avatarSkin, String messageText) {
+        String webhookUrl = plugin.getConfig().getString("discord-chat-webhook-url", "");
+        String bridgeUrl = plugin.getConfig().getString("discord-bridge-url", "http://localhost:3002/chat/bridge");
+
+        String jsonPayload;
+        String targetUrl;
+
+        if (webhookUrl != null && !webhookUrl.trim().isEmpty()) {
+            targetUrl = webhookUrl.trim();
+            jsonPayload = String.format(
+                "{\"username\": \"%s\", \"avatar_url\": \"https://mc-heads.net/avatar/%s\", \"content\": \"%s\"}",
+                escapeJson(playerName),
+                escapeJson(avatarSkin),
+                escapeJson(messageText)
+            );
+        } else {
+            targetUrl = bridgeUrl;
+            jsonPayload = String.format(
+                "{\"username\": \"%s\", \"message\": \"%s\"}",
+                escapeJson(playerName),
+                escapeJson(messageText)
+            );
+        }
+
+        try {
+            URL url = new java.net.URI(targetUrl).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; utf-8");
+            conn.setRequestProperty("User-Agent", "CrystalCore-Minecraft");
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) {
+                plugin.getLogger().warning(() -> "Failed to send chat bridge payload: HTTP " + code);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning(() -> "Error forwarding chat to Discord: " + e.getMessage());
+        }
+    }
+
+    private String escapeJson(String input) {
+        if (input == null) return "";
+        return input.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\b", "\\b")
+                    .replace("\f", "\\f")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t");
+    }
+
     private void markCommandAsExecuted(int id) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = databaseModule.getConnection();
@@ -378,7 +502,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 ps.setInt(1, id);
                 ps.executeUpdate();
             } catch (SQLException e) {
-                plugin.getLogger().log(Level.SEVERE, "Failed to mark command " + id + " as executed", e);
+                plugin.getLogger().log(Level.SEVERE, "Failed to mark command {0} as executed", id);
             }
         });
     }

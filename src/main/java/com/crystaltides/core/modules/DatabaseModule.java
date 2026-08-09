@@ -5,6 +5,7 @@ import com.crystaltides.core.api.CrystalModule;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 public class DatabaseModule extends CrystalModule {
@@ -66,18 +67,19 @@ public class DatabaseModule extends CrystalModule {
     private void verifyTables() {
         try (Connection conn = getConnection()) {
             // Universal Verification Table
-            conn.prepareStatement(
+            try (PreparedStatement ps = conn.prepareStatement(
                     "CREATE TABLE IF NOT EXISTS universal_links (" +
                             "code VARCHAR(10) PRIMARY KEY, " +
                             "source VARCHAR(20) NOT NULL, " +
                             "source_id VARCHAR(100) NOT NULL, " +
                             "player_name VARCHAR(16), " +
                             "expires_at BIGINT NOT NULL, " +
-                            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-                    .execute();
+                            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")) {
+                ps.execute();
+            }
 
             // Unified Linked Accounts Table
-            conn.prepareStatement(
+            try (PreparedStatement ps = conn.prepareStatement(
                     "CREATE TABLE IF NOT EXISTS linked_accounts (" +
                             "minecraft_uuid VARCHAR(36) PRIMARY KEY, " +
                             "minecraft_name VARCHAR(16), " +
@@ -90,13 +92,20 @@ public class DatabaseModule extends CrystalModule {
                             "kills INT DEFAULT 0, " +
                             "deaths INT DEFAULT 0, " +
                             "last_seen BIGINT DEFAULT 0, " +
-                            "linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-                    .execute();
+                            "linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")) {
+                ps.execute();
+            }
 
             // Secure Queue Table
-            conn.prepareStatement(
-                    "CREATE TABLE IF NOT EXISTS web_pending_commands (id INT AUTO_INCREMENT PRIMARY KEY, command VARCHAR(512) NOT NULL, executed BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, executed_at TIMESTAMP NULL);")
-                    .execute();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "CREATE TABLE IF NOT EXISTS web_pending_commands (" +
+                            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                            "command VARCHAR(512) NOT NULL, " +
+                            "executed BOOLEAN DEFAULT FALSE, " +
+                            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                            "executed_at TIMESTAMP NULL);")) {
+                ps.execute();
+            }
 
             plugin.getLogger().info("Database tables verified.");
         } catch (SQLException e) {

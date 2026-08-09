@@ -17,6 +17,13 @@ public class WebSocketModule extends CrystalModule {
         int port = plugin.getConfig().getInt("websocket.port", 8887);
         String secret = plugin.getConfig().getString("websocket.secret-token", "changeme");
 
+        if (secret.isEmpty() || secret.equals("change_me_to_something_secure") || secret.equals("changeme")) {
+            plugin.getLogger().severe("§c[SECURITY] WebSocket secret-token is set to the default value! "
+                    + "Please change it in config.yml to a secure, random string.");
+            plugin.getLogger().warning("§e[SECURITY] Using default WebSocket secret is a security risk. "
+                    + "The WebSocket server will still start but unauthorized access is likely.");
+        }
+
         server = new CrystalWebSocketServer(plugin, port, secret);
         server.start();
 
@@ -30,7 +37,8 @@ public class WebSocketModule extends CrystalModule {
                 server.stop();
                 plugin.getLogger().info("WebSocket Server stopped.");
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+                plugin.getSLF4JLogger().error("Error al detener el servidor WebSocket", e);
             }
         }
         super.onDisable();

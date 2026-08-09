@@ -2,6 +2,7 @@ package com.crystaltides.core.api;
 
 import com.crystaltides.core.CrystalCore;
 import org.bukkit.event.Listener;
+import java.util.logging.Level;
 
 public abstract class CrystalModule implements Module, Listener {
 
@@ -9,7 +10,7 @@ public abstract class CrystalModule implements Module, Listener {
     private final String name;
     private boolean enabled = false;
 
-    public CrystalModule(CrystalCore plugin, String name) {
+    protected CrystalModule(CrystalCore plugin, String name) {
         this.plugin = plugin;
         this.name = name;
     }
@@ -19,7 +20,7 @@ public abstract class CrystalModule implements Module, Listener {
         this.enabled = true;
         // Register events if the module is a listener
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        plugin.getLogger().info("[Module] " + name + " enabled.");
+        plugin.getLogger().log(Level.INFO, () -> "[Module] " + name + " enabled.");
     }
 
     @Override
@@ -27,7 +28,7 @@ public abstract class CrystalModule implements Module, Listener {
         this.enabled = false;
         // Unregistering events is usually handled by Bukkit on plugin disable,
         // but for individual module toggling we might need explicit handling later.
-        plugin.getLogger().info("[Module] " + name + " disabled.");
+        plugin.getLogger().log(Level.INFO, () -> "[Module] " + name + " disabled.");
     }
 
     @Override

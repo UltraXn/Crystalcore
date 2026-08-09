@@ -15,10 +15,14 @@ public class CrystalProfile {
     // Stats
     private volatile long lastSeen;
     private volatile int blocksMined;
+    private volatile int blocksPlaced;
     private volatile int kills;
+    private volatile int mobKills;
     private volatile int deaths;
+    private volatile long playtimeSeconds;
+    private volatile int streakDays;
 
-    // Economy (Future placeholder)
+    // Economy
     private volatile long killucoins;
 
     public CrystalProfile(UUID uuid, String playerName) {
@@ -27,8 +31,13 @@ public class CrystalProfile {
         this.linked = false;
         this.lastSeen = System.currentTimeMillis();
         this.blocksMined = 0;
+        this.blocksPlaced = 0;
         this.kills = 0;
+        this.mobKills = 0;
         this.deaths = 0;
+        this.playtimeSeconds = 0;
+        this.streakDays = 1;
+        this.killucoins = 0;
     }
 
     public UUID getUuid() {
@@ -91,6 +100,18 @@ public class CrystalProfile {
         this.blocksMined++;
     }
 
+    public int getBlocksPlaced() {
+        return blocksPlaced;
+    }
+
+    public void setBlocksPlaced(int blocksPlaced) {
+        this.blocksPlaced = blocksPlaced;
+    }
+
+    public void addBlockPlaced() {
+        this.blocksPlaced++;
+    }
+
     public int getKills() {
         return kills;
     }
@@ -103,6 +124,18 @@ public class CrystalProfile {
         this.kills++;
     }
 
+    public int getMobKills() {
+        return mobKills;
+    }
+
+    public void setMobKills(int mobKills) {
+        this.mobKills = mobKills;
+    }
+
+    public void addMobKill() {
+        this.mobKills++;
+    }
+
     public int getDeaths() {
         return deaths;
     }
@@ -113,5 +146,35 @@ public class CrystalProfile {
 
     public void addDeath() {
         this.deaths++;
+    }
+
+    public long getPlaytimeSeconds() {
+        return playtimeSeconds;
+    }
+
+    public void setPlaytimeSeconds(long playtimeSeconds) {
+        this.playtimeSeconds = playtimeSeconds;
+    }
+
+    public void addPlaytimeSeconds(long seconds) {
+        this.playtimeSeconds += seconds;
+    }
+
+    public int getStreakDays() {
+        return streakDays;
+    }
+
+    public void setStreakDays(int streakDays) {
+        this.streakDays = streakDays;
+    }
+
+    private volatile String language = "es";
+
+    public String getLanguage() {
+        return language != null ? language : "es";
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
     }
 }
