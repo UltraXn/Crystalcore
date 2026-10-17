@@ -1,17 +1,36 @@
-server-id: "survival"
+server-id: 'survival'
 
 database:
-  host: "127.0.0.1"
-  port: "3306"
-  name: "your_database"
-  user: "root"
-  password: "password"
+  host: '127.0.0.1'
+  port: '3306'
+  name: 'your_database'
+  user: 'root'
+  password: 'password'
+  pool:
+    pool-name: 'CrystalCore-HikariPool'
+    maximum-pool-size: 10
+    minimum-idle: 2
+    connection-timeout: 30000
+    max-lifetime: 1800000
+    keepalive-time: 60000
+    leak-detection-threshold: 60000
+  properties:
+    cachePrepStmts: true
+    prepStmtCacheSize: 250
+    prepStmtCacheSqlLimit: 2048
+    useServerPrepStmts: true
+    useLocalSessionState: true
+    rewriteBatchedStatements: true
+    cacheResultSetMetadata: true
+    cacheServerConfiguration: true
+    elideSetAutoCommits: true
+    maintainTimeStats: false
 
 redis:
   enabled: true
-  host: "127.0.0.1"
+  host: '127.0.0.1'
   port: 6379
-  password: ""
+  password: ''
   timeout: 2000
 
 # Polling interval in ticks (20 ticks = 1 second)
@@ -29,10 +48,10 @@ modules:
 gacha:
   # Map CustomModelData to Tier ID
   items:
-    1001: "tier_bronce"
-    1002: "tier_plata"
-    1003: "tier_oro"
+    1001: 'tier_bronce'
+    1002: 'tier_plata'
+    1003: 'tier_oro'
 
 websocket:
   port: 8887
-  secret-token: "change_me_to_something_secure"
+  secret-token: 'change_me_to_something_secure'

@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.logging.Level;
 
 import java.net.URI;
@@ -90,7 +91,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                         // though checkForCommands runs async DB queries.
                         // We run it async immediately.
                         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> checkForCommands());
-                    } else if (message.equals("pong")) {
+                    } else if ("pong".equals(message)) {
                         // Heartbeat response
                     }
                 }
@@ -148,23 +149,24 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
     private void handleLinkCode(Player player, String code) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try (Connection conn = databaseModule.getConnection()) {
-                String source = null;
-                String sourceId = null;
+                String source;
+                String sourceId;
 
                 try (PreparedStatement stmt = conn
                         .prepareStatement("SELECT source, source_id, expires_at FROM universal_links WHERE code = ?")) {
-                    stmt.setString(1, code.toUpperCase());
-                    ResultSet rs = stmt.executeQuery();
-                    if (rs.next()) {
-                        if (System.currentTimeMillis() > rs.getLong("expires_at")) {
-                            player.sendMessage("§cCódigo expirado.");
+                    stmt.setString(1, code.toUpperCase(Locale.ROOT));
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            if (System.currentTimeMillis() > rs.getLong("expires_at")) {
+                                player.sendMessage("§cCódigo expirado.");
+                                return;
+                            }
+                            source = rs.getString("source");
+                            sourceId = rs.getString("source_id");
+                        } else {
+                            player.sendMessage("§cCódigo inválido.");
                             return;
                         }
-                        source = rs.getString("source");
-                        sourceId = rs.getString("source_id");
-                    } else {
-                        player.sendMessage("§cCódigo inválido.");
-                        return;
                     }
                 }
 
@@ -192,7 +194,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
     }
 
     private void cleanPreviousLinks(Connection conn, String source, String sourceId, String uuidStr) throws SQLException {
-        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
+        if (SOURCE_DISCORD.equalsIgnoreCase(source)) {
             try (PreparedStatement clean = conn.prepareStatement(
                     "UPDATE linked_accounts SET discord_id = NULL, discord_tag = NULL WHERE discord_id = ?")) {
                 clean.setString(1, sourceId);
@@ -203,7 +205,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                 clean.setString(1, uuidStr);
                 clean.executeUpdate();
             }
-        } else if (source.equalsIgnoreCase(SOURCE_WEB)) {
+        } else if (SOURCE_WEB.equalsIgnoreCase(source)) {
             try (PreparedStatement clean = conn
                     .prepareStatement("UPDATE linked_accounts SET web_user_id = NULL WHERE web_user_id = ?")) {
                 clean.setString(1, sourceId);
@@ -218,11 +220,11 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
     }
 
     private String getLinkInsertQuery(String source) {
-        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
+        if (SOURCE_DISCORD.equalsIgnoreCase(source)) {
             return "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, discord_id) VALUES (?, ?, ?) "
                     + "ON DUPLICATE KEY UPDATE minecraft_name = ?, discord_id = ?";
         }
-        if (source.equalsIgnoreCase(SOURCE_WEB)) {
+        if (SOURCE_WEB.equalsIgnoreCase(source)) {
             return "INSERT INTO linked_accounts (minecraft_uuid, minecraft_name, web_user_id) VALUES (?, ?, ?) "
                     + "ON DUPLICATE KEY UPDATE minecraft_name = ?, web_user_id = ?";
         }
@@ -236,9 +238,9 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
         if (profile == null) return;
 
         profile.setLinked(true);
-        if (source.equalsIgnoreCase(SOURCE_DISCORD)) {
+        if (SOURCE_DISCORD.equalsIgnoreCase(source)) {
             profile.setDiscordId(sourceId);
-        } else if (source.equalsIgnoreCase(SOURCE_WEB)) {
+        } else if (SOURCE_WEB.equalsIgnoreCase(source)) {
             profile.setWebUserId(sourceId);
         }
     }
@@ -269,7 +271,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
             try (PreparedStatement cleanupCode = conn
                     .prepareStatement("DELETE FROM universal_links WHERE code = ?")) {
-                cleanupCode.setString(1, code.toUpperCase());
+                cleanupCode.setString(1, code.toUpperCase(Locale.ROOT));
                 cleanupCode.executeUpdate();
             }
         }
@@ -359,8 +361,8 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                                 .prepareStatement("DELETE FROM universal_links WHERE expires_at < ?")) {
                     stmt.setLong(1, System.currentTimeMillis());
                     stmt.executeUpdate();
-                } catch (SQLException e) {
-                    // Ignore if db closed
+                } catch (SQLException ignored) {
+                    // Ignore if db is closing during shutdown
                 }
             }
         }.runTaskTimerAsynchronously(plugin, interval, interval);
@@ -430,9 +432,9 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
 
         final String avatarSkin = skinName;
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            sendChatToDiscordBridge(playerName, avatarSkin, messageText);
-        });
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
+            sendChatToDiscordBridge(playerName, avatarSkin, messageText)
+        );
     }
 
     private void sendChatToDiscordBridge(String playerName, String avatarSkin, String messageText) {
@@ -539,7 +541,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
         public String onPlaceholderRequest(Player player, String identifier) {
             if (player == null)
                 return "";
-            if (identifier.equals("status")) {
+            if ("status".equals(identifier)) {
                 ProfileModule pm = plugin.getModuleManager().getModule(ProfileModule.class);
                 if (pm != null) {
                     CrystalProfile profile = pm.getProfile(player.getUniqueId());

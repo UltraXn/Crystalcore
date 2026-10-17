@@ -18,9 +18,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.crystaltides.core.modules.AIEventStreamModule;
+import com.crystaltides.core.modules.MarketplaceModule;
+import com.crystaltides.core.modules.BossTelemetryModule;
+import com.crystaltides.core.modules.DungeonSpeedrunModule;
 import com.crystaltides.core.commands.MisionesCommand;
+import com.crystaltides.core.commands.BolsaCommand;
+import com.crystaltides.core.commands.SpeedrunCommand;
 
 import com.crystaltides.core.bridge.CrystalBridgeAPI;
+import java.util.Locale;
 
 public class CrystalCore extends JavaPlugin {
 
@@ -52,6 +58,9 @@ public class CrystalCore extends JavaPlugin {
         moduleManager.registerModule(new WebBridgeModule(this));
         moduleManager.registerModule(new DuelModule(this));
         moduleManager.registerModule(new AIEventStreamModule(this));
+        moduleManager.registerModule(new MarketplaceModule(this));
+        moduleManager.registerModule(new BossTelemetryModule(this));
+        moduleManager.registerModule(new DungeonSpeedrunModule(this));
 
         // Enable Modules
         moduleManager.enableModules();
@@ -62,6 +71,17 @@ public class CrystalCore extends JavaPlugin {
         if (getCommand(CMD_REPORT) != null) getCommand(CMD_REPORT).setExecutor(this);
         if (getCommand(CMD_LANG) != null) getCommand(CMD_LANG).setExecutor(this);
         if (getCommand("misiones") != null) getCommand("misiones").setExecutor(new MisionesCommand(this));
+
+        if (getCommand(CMD_BOLSA) != null) {
+            BolsaCommand bolsaCmd = new BolsaCommand(this);
+            getCommand(CMD_BOLSA).setExecutor(bolsaCmd);
+            getCommand(CMD_BOLSA).setTabCompleter(bolsaCmd);
+        }
+        if (getCommand(CMD_SPEEDRUN) != null) {
+            SpeedrunCommand speedrunCmd = new SpeedrunCommand(this);
+            getCommand(CMD_SPEEDRUN).setExecutor(speedrunCmd);
+            getCommand(CMD_SPEEDRUN).setTabCompleter(speedrunCmd);
+        }
 
         getLogger().info("CrystalCore has been enabled (Modular Mode)!");
     }
@@ -92,7 +112,7 @@ public class CrystalCore extends JavaPlugin {
         }
 
         String wsToken = getConfig().getString("websocket.secret-token", "");
-        if (wsToken.isEmpty() || wsToken.equals("change_me_to_something_secure") || wsToken.equals("changeme")) {
+        if (wsToken.isEmpty() || "change_me_to_something_secure".equals(wsToken) || "changeme".equals(wsToken)) {
             getLogger().severe("§c[SECURITY] WebSocket secret-token is set to the default value! "
                     + "Please change it in config.yml to a secure, random string.");
         }
@@ -101,6 +121,8 @@ public class CrystalCore extends JavaPlugin {
     private static final String CMD_RULES = "rules";
     private static final String CMD_REPORT = "report";
     private static final String CMD_LANG = "lang";
+    private static final String CMD_BOLSA = "bolsa";
+    private static final String CMD_SPEEDRUN = "speedrun";
     private static final String KEY_LANG = "language";
 
     private String getPlayerLanguage(CommandSender sender) {
@@ -120,18 +142,18 @@ public class CrystalCore extends JavaPlugin {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String msgPrefix = getConfig().getString("messages.prefix", "§b§l[CrystalCore] §8» §7");
         String lang = getPlayerLanguage(sender);
-        String name = command.getName().toLowerCase();
+        String name = command.getName().toLowerCase(Locale.ROOT);
 
-        if (name.equals(CMD_LANG) || name.equals(KEY_LANG) || name.equals("idioma")) {
+        if (CMD_LANG.equals(name) || KEY_LANG.equals(name) || "idioma".equals(name)) {
             return handleLangCommand(sender, args, msgPrefix);
         }
-        if (name.equals("crystalcore")) {
+        if ("crystalcore".equals(name)) {
             return handleCrystalCoreCommand(sender, args, msgPrefix, lang);
         }
-        if (name.equals(CMD_RULES) || name.equals("reglas")) {
+        if (CMD_RULES.equals(name) || "reglas".equals(name)) {
             return handleRulesCommand(sender, msgPrefix, lang);
         }
-        if (name.equals(CMD_REPORT) || name.equals("reportar")) {
+        if (CMD_REPORT.equals(name) || "reportar".equals(name)) {
             return handleReportCommand(sender, args, msgPrefix, lang);
         }
 
@@ -148,19 +170,19 @@ public class CrystalCore extends JavaPlugin {
         CrystalProfile profile = profileModule != null ? profileModule.getProfile(player.getUniqueId()) : null;
 
         if (args.length == 0) {
-            String currentLang = profile != null ? profile.getLanguage().toUpperCase() : "ES";
+            String currentLang = profile != null ? profile.getLanguage().toUpperCase(Locale.ROOT) : "ES";
             sender.sendMessage(msgPrefix + "§7Idioma actual / Current language: §e" + currentLang);
             sender.sendMessage(msgPrefix + "§7Cambiar / Change: §e/lang es §7o §e/lang en");
             return true;
         }
 
-        String chosen = args[0].toLowerCase();
-        if (chosen.equals("en") || chosen.equals("english")) {
+        String chosen = args[0].toLowerCase(Locale.ROOT);
+        if ("en".equals(chosen) || "english".equals(chosen)) {
             if (profile != null) profile.setLanguage("en");
             sender.sendMessage(msgPrefix + "§aLanguage set to English (EN).");
             return true;
         }
-        if (chosen.equals("es") || chosen.equals("spanish") || chosen.equals("español")) {
+        if ("es".equals(chosen) || "spanish".equals(chosen) || "español".equals(chosen)) {
             if (profile != null) profile.setLanguage("es");
             sender.sendMessage(msgPrefix + "§aIdioma establecido a Español (ES).");
             return true;

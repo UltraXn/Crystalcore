@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/bukkit-plugin.json
 name: CrystalCore
 version: ${project.version}
-api-version: "1.21"
+api-version: '1.21'
 main: com.crystaltides.core.CrystalCore
 author: UltraXn & Antigravity
 description: El corazón de CrystalTides SMP. Maneja vinculación de cuentas y puente web.
@@ -43,4 +43,11 @@ commands:
     description: Muestra las misiones diarias generadas por el Dungeon Master de la IA.
     aliases: [misión, mision, quests, quest]
     usage: /misiones
-
+  bolsa:
+    description: Accede a la Bolsa de Valores de Recursos Dinámica de CrystalTides.
+    aliases: [market, mercado, bolsadevalores]
+    usage: /bolsa [ver|sell|buy] [recurso] [cantidad]
+  speedrun:
+    description: Consulta o inicia un intento de Speedrun en mazmorras y dimensiones rotativas.
+    aliases: [dungeon, mazmorra]
+    usage: /speedrun [status|start|complete|cancel|top] <mazmorra>

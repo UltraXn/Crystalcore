@@ -21,6 +21,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -80,12 +81,12 @@ public class AIEventStreamModule extends CrystalModule {
         if (killer == null) return;
 
         String entityCustomName = entity.getName();
-        String entityTypeId = entity.getType().getKey().toString().toLowerCase();
+        String entityTypeId = entity.getType().getKey().toString().toLowerCase(Locale.ROOT);
 
         // Verificar si es un boss en la whitelist o una entidad personalizada mítica
         boolean isBoss = BOSS_WHITELIST.contains(entityTypeId) 
-                || entityCustomName.toLowerCase().contains("boss") 
-                || entityCustomName.toLowerCase().contains("jefe");
+                || entityCustomName.toLowerCase(Locale.ROOT).contains("boss") 
+                || entityCustomName.toLowerCase(Locale.ROOT).contains("jefe");
 
         if (!isBoss) return;
 

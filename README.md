@@ -52,13 +52,13 @@ graph TD
 
 ## 🛠️ Tech Stack
 
-| Componente | Tecnología | Propósito |
-| :--- | :--- | :--- |
-| **Runtime** | Java 17+ (LTS) | Estabilidad y rendimiento de servidor |
-| **API** | Paper / Spigot | Compatibilidad con plugins y optimizaciones de TPS |
-| **Persistence** | MariaDB / MySQL | Almacenamiento de perfiles y auditoría |
-| **Cache** | Redis | Cómputo temporal y sincronización rápida |
-| **Build Tool** | [Maven](https://maven.apache.org/) | Gestión de dependencias y empaquetado |
+| Componente      | Tecnología                         | Propósito                                          |
+| :-------------- | :--------------------------------- | :------------------------------------------------- |
+| **Runtime**     | Java 17+ (LTS)                     | Estabilidad y rendimiento de servidor              |
+| **API**         | Paper / Spigot                     | Compatibilidad con plugins y optimizaciones de TPS |
+| **Persistence** | MariaDB / MySQL                    | Almacenamiento de perfiles y auditoría             |
+| **Cache**       | Redis                              | Cómputo temporal y sincronización rápida           |
+| **Build Tool**  | [Maven](https://maven.apache.org/) | Gestión de dependencias y empaquetado              |
 
 ---
 
@@ -66,12 +66,12 @@ graph TD
 
 El plugin se parametriza mediante un `config.yml` robusto. Aquí los bloques más importantes:
 
-| Bloque | Variables Clave | Propósito |
-| :--- | :--- | :--- |
-| **database** | `host`, `port`, `user`, `password` | Conexión a la DB persistente |
-| **redis** | `enabled`, `host`, `port` | Sincronización y caché volátil |
-| **websocket** | `port`, `secret-token` | Seguridad del canal de bridge rápido |
-| **modules** | `Profiles`, `WebBridge`, `Gacha` | Habilitación de funcionalidades específicas |
+| Bloque        | Variables Clave                    | Propósito                                   |
+| :------------ | :--------------------------------- | :------------------------------------------ |
+| **database**  | `host`, `port`, `user`, `password` | Conexión a la DB persistente                |
+| **redis**     | `enabled`, `host`, `port`          | Sincronización y caché volátil              |
+| **websocket** | `port`, `secret-token`             | Seguridad del canal de bridge rápido        |
+| **modules**   | `Profiles`, `WebBridge`, `Gacha`   | Habilitación de funcionalidades específicas |
 
 ---
 
@@ -84,6 +84,7 @@ Para generar el archivo `.jar` listo para desplegar:
 ```bash
 mvn clean package
 ```
+
 El archivo resultante se encontrará en la carpeta `target/`.
 
 ---

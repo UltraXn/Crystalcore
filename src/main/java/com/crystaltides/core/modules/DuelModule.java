@@ -14,6 +14,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -77,7 +78,7 @@ public class DuelModule extends CrystalModule implements CommandExecutor {
             return false;
         }
 
-        String sub = args[0].toLowerCase();
+        String sub = args[0].toLowerCase(Locale.ROOT);
         if ("retar".equals(sub) || "challenge".equals(sub)) {
             handleChallenge(player, args);
             return true;

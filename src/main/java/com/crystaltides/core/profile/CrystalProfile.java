@@ -1,6 +1,8 @@
 package com.crystaltides.core.profile;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class CrystalProfile {
 
@@ -14,12 +16,12 @@ public class CrystalProfile {
 
     // Stats
     private volatile long lastSeen;
-    private volatile int blocksMined;
-    private volatile int blocksPlaced;
-    private volatile int kills;
-    private volatile int mobKills;
-    private volatile int deaths;
-    private volatile long playtimeSeconds;
+    private final AtomicInteger blocksMined;
+    private final AtomicInteger blocksPlaced;
+    private final AtomicInteger kills;
+    private final AtomicInteger mobKills;
+    private final AtomicInteger deaths;
+    private final AtomicLong playtimeSeconds;
     private volatile int streakDays;
 
     // Economy
@@ -30,12 +32,12 @@ public class CrystalProfile {
         this.playerName = playerName;
         this.linked = false;
         this.lastSeen = System.currentTimeMillis();
-        this.blocksMined = 0;
-        this.blocksPlaced = 0;
-        this.kills = 0;
-        this.mobKills = 0;
-        this.deaths = 0;
-        this.playtimeSeconds = 0;
+        this.blocksMined = new AtomicInteger(0);
+        this.blocksPlaced = new AtomicInteger(0);
+        this.kills = new AtomicInteger(0);
+        this.mobKills = new AtomicInteger(0);
+        this.deaths = new AtomicInteger(0);
+        this.playtimeSeconds = new AtomicLong(0L);
         this.streakDays = 1;
         this.killucoins = 0;
     }
@@ -89,75 +91,75 @@ public class CrystalProfile {
     }
 
     public int getBlocksMined() {
-        return blocksMined;
+        return blocksMined.get();
     }
 
     public void setBlocksMined(int blocksMined) {
-        this.blocksMined = blocksMined;
+        this.blocksMined.set(blocksMined);
     }
 
     public void addBlockMined() {
-        this.blocksMined++;
+        this.blocksMined.incrementAndGet();
     }
 
     public int getBlocksPlaced() {
-        return blocksPlaced;
+        return blocksPlaced.get();
     }
 
     public void setBlocksPlaced(int blocksPlaced) {
-        this.blocksPlaced = blocksPlaced;
+        this.blocksPlaced.set(blocksPlaced);
     }
 
     public void addBlockPlaced() {
-        this.blocksPlaced++;
+        this.blocksPlaced.incrementAndGet();
     }
 
     public int getKills() {
-        return kills;
+        return kills.get();
     }
 
     public void setKills(int kills) {
-        this.kills = kills;
+        this.kills.set(kills);
     }
 
     public void addKill() {
-        this.kills++;
+        this.kills.incrementAndGet();
     }
 
     public int getMobKills() {
-        return mobKills;
+        return mobKills.get();
     }
 
     public void setMobKills(int mobKills) {
-        this.mobKills = mobKills;
+        this.mobKills.set(mobKills);
     }
 
     public void addMobKill() {
-        this.mobKills++;
+        this.mobKills.incrementAndGet();
     }
 
     public int getDeaths() {
-        return deaths;
+        return deaths.get();
     }
 
     public void setDeaths(int deaths) {
-        this.deaths = deaths;
+        this.deaths.set(deaths);
     }
 
     public void addDeath() {
-        this.deaths++;
+        this.deaths.incrementAndGet();
     }
 
     public long getPlaytimeSeconds() {
-        return playtimeSeconds;
+        return playtimeSeconds.get();
     }
 
     public void setPlaytimeSeconds(long playtimeSeconds) {
-        this.playtimeSeconds = playtimeSeconds;
+        this.playtimeSeconds.set(playtimeSeconds);
     }
 
     public void addPlaytimeSeconds(long seconds) {
-        this.playtimeSeconds += seconds;
+        this.playtimeSeconds.addAndGet(seconds);
     }
 
     public int getStreakDays() {
