@@ -20,6 +20,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.Level;
 
 import java.net.URI;
@@ -76,7 +77,16 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
             String wsUrl = plugin.getConfig().getString("websocket-url", "ws://localhost:3001");
             URI uri = new URI(wsUrl);
 
-            wsClient = new WebSocketClient(uri) {
+            // The web-server only accepts the bridge with this token (BRIDGE_WS_TOKEN there).
+            // Without it, commands still arrive through the 10-second queue poll.
+            String wsToken = plugin.getConfig().getString("websocket-token", "");
+            if (wsToken.isEmpty()) {
+                plugin.getLogger().warning("websocket-token is empty: Web Bridge will rely on queue polling only.");
+                return;
+            }
+            Map<String, String> headers = Map.of("Authorization", "Bearer " + wsToken);
+
+            wsClient = new WebSocketClient(uri, headers) {
                 @Override
                 public void onOpen(ServerHandshake handshakedata) {
                     plugin.getLogger().info("✅ Connected to Web Bridge via WebSocket!");
@@ -92,7 +102,7 @@ public class WebBridgeModule extends CrystalModule implements CommandExecutor {
                         // We run it async immediately.
                         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> checkForCommands());
                     } else if ("pong".equals(message)) {
-                        // Heartbeat response
+                        plugin.getLogger().fine(() -> "WebSocket heartbeat acknowledged (pong)");
                     }
                 }
 
