@@ -22,7 +22,8 @@ import java.util.logging.Level;
 public class CrystalBridgeAPI implements PluginMessageListener {
 
     public static final String CHANNEL = "crystaltides:bridge";
-    private static CrystalBridgeAPI instance;
+    private static final Object LOCK = new Object();
+    private static volatile CrystalBridgeAPI instance;
 
     private final Plugin plugin;
     private final Map<String, List<Consumer<Map<String, Object>>>> listeners = new ConcurrentHashMap<>();
@@ -37,9 +38,13 @@ public class CrystalBridgeAPI implements PluginMessageListener {
         plugin.getLogger().info("⚡ [CrystalBridgeAPI] Canal de comunicación Plugin <-> Mod ('" + CHANNEL + "') registrado.");
     }
 
-    public static synchronized void init(Plugin plugin) {
+    public static void init(Plugin plugin) {
         if (instance == null) {
-            instance = new CrystalBridgeAPI(plugin);
+            synchronized (LOCK) {
+                if (instance == null) {
+                    instance = new CrystalBridgeAPI(plugin);
+                }
+            }
         }
     }
 

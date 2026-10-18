@@ -102,6 +102,29 @@
                     </java>
                 </configuration>
             </plugin>
+            <!-- Mockito 5 carga su mock maker como agente de Java. Sin -javaagent intenta
+                 adjuntarse a la JVM en caliente, y en CI falla ("Could not self-attach"). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+                <configuration>
+                    <!-- @{argLine} conserva el agente que añade JaCoCo (prepare-agent) -->
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
             <!-- JaCoCo: Generación de reporte XML de cobertura para SonarQube -->
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -217,7 +240,7 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.11.0</version>
+            <version>5.14.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

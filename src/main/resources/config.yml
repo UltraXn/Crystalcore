@@ -55,3 +55,9 @@ gacha:
 websocket:
   port: 8887
   secret-token: 'change_me_to_something_secure'
+
+# Cliente del Web Bridge: conexión con el web-server (/ws) para recibir comandos al instante.
+# websocket-token = BRIDGE_WS_TOKEN del web-server (mínimo 32 caracteres).
+# Vacío = sin WebSocket: los comandos llegan igual por el sondeo de la cola cada 10 s.
+websocket-url: 'ws://localhost:3001'
+websocket-token: ''
